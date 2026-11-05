@@ -15,11 +15,12 @@
 | Tabular LineWorld learning in Goose/C/Python | [Goose](../examples/rl/lineworld.goose) · [C](../benchmarks/c/lineworld.c) · [Python](../benchmarks/python/lineworld.py) | Identical 23,116 transitions; optimal 7-step policy; [passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42058069523) |
 | Goose/C comparative CPU harness | [runner](../benchmarks/runner/compare.py) | GitHub Actions; JSON evidence |
 | Goose → OpenBLAS SGEMM | [BLAS package](../backends/blas/blas.goose) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42057100349); 192 benchmark samples, no failures |
+| Native CPU DQN with replay and target network | [DQN example](../examples/dqn/lineworld.goose) | [Passing training CI](https://github.com/arman-dogru/deep-goose/actions/runs/42058760404): 12,000 steps, 11,969 updates, optimal 7-step greedy policy; [report](../benchmarks/reports/2026-11-05-dqn-lineworld.md) |
 | End-to-end linear regression, Goose/C/NumPy/PyTorch/Python | [runner](../benchmarks/runner/train_compare.py) | Training converged and compared; [report](../benchmarks/reports/2026-11-05-regression-training.md) |
 
-## Code added, currently under additional validation
+## Additional validation still required
 
-- Native CPU DQN training with one-hot state, replay minibatches, two-layer ReLU Q-network, separate target parameters, explicit MSE gradients and SGD: [examples/dqn/lineworld.goose](../examples/dqn/lineworld.goose). Its full run and convergence test should only be marked verified after passing CI.
+- CPU DQN learning has passed on one deterministic task. Larger tasks, multiple seeds and equivalent Python/C implementations are required for general RL performance or stability claims.
 - Larger matrix/batch performance sweeps remain necessary even for already working primitives.
 
 ## Benchmarks published
@@ -30,6 +31,7 @@
 4. [Loop-reordered GEMM](../benchmarks/reports/2026-11-05-gemm-loop-order.md).
 5. [Shared OpenBLAS integration](../benchmarks/reports/2026-11-05-openblas.md).
 6. [Tabular RL comparison](../benchmarks/reports/2026-11-05-lineworld.md).
+7. [Native CPU DQN training](../benchmarks/reports/2026-11-05-dqn-lineworld.md).
 
 All current timings originate from GitHub-hosted CPU VMs. These numbers are **exploratory and unsuitable for publication-grade speedup claims**. Many have only 3 trials, and model/task dimensions are small. The latest BLAS report also identifies overhead remaining between Goose and C calling the same library.
 
