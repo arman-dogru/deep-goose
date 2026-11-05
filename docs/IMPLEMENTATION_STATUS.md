@@ -9,6 +9,11 @@
 | Native CPU elementwise / dot / GEMM | [cpu.goose](../src/ops/cpu.goose) | [cpu_ops.goose](../tests/goose/cpu_ops.goose) |
 | Dense forward / backward, MSE and SGD | [cpu.goose](../src/ops/cpu.goose) | Tensor unit test; regression-learning test |
 | Adam optimizer primitive | [cpu.goose](../src/ops/cpu.goose) | First-step moment and parameter check |
+| Stable softmax, log-softmax and cross-entropy | [classification.goose](../src/ops/classification.goose) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42060092564): extreme-logit and finite-difference tests |
+| Multiclass dense-layer training | [training example](../examples/classification/train.goose) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42061275452): 90/90 correct, MSE not applicable, cross-entropy 0.01633 |
+| Versioned dense-parameter checkpoints (weights/bias only) | [checkpoint.goose](../src/nn/checkpoint.goose) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42061959784): roundtrip and malformed-file rejection |
+| Full Adam regression training, five implementations | [Goose](../examples/regression/adam.goose) and [comparison runner](../benchmarks/runner/train_compare.py) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42060658305): all converged |
+| BLAS adapter-matched C comparison | [benchmark](../benchmarks/c/blas_bench.c) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42061105147) and [report](../benchmarks/reports/2026-11-05-blas-adapter-matched.md) |
 | Dense weight/bias numerical gradients | [gradient_check.goose](../tests/goose/gradient_check.goose) | Central finite-difference checks |
 | Nonlinear 2→8→1 ReLU training | [XOR example](../examples/xor/train.goose) | Loss below 1e-4; [passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42055780379) |
 | Tabular Q-learning and replay | [tabular.goose](../src/rl/tabular.goose) | Unit tests |
@@ -32,6 +37,7 @@
 5. [Shared OpenBLAS integration](../benchmarks/reports/2026-11-05-openblas.md).
 6. [Tabular RL comparison](../benchmarks/reports/2026-11-05-lineworld.md).
 7. [Native CPU DQN training](../benchmarks/reports/2026-11-05-dqn-lineworld.md).
+8. [Adapter-matched Goose/C OpenBLAS](../benchmarks/reports/2026-11-05-blas-adapter-matched.md).
 
 All current timings originate from GitHub-hosted CPU VMs. These numbers are **exploratory and unsuitable for publication-grade speedup claims**. Many have only 3 trials, and model/task dimensions are small. The latest BLAS report also identifies overhead remaining between Goose and C calling the same library.
 
@@ -39,13 +45,13 @@ All current timings originate from GitHub-hosted CPU VMs. These numbers are **ex
 
 - [ ] Robust per-element numerical references across shapes and edge cases.
 - [ ] General f32/f64 tensor API, tensor views and documented memory lifetimes.
-- [ ] Adam demonstrated in a full training example (not only a one-step unit test).
-- [ ] Stable softmax/log-softmax and cross entropy.
-- [ ] More complete dense MLP model serialization/checkpoints and gradient checks.
+- [x] Adam demonstrated in a full training example and compared against C/NumPy/PyTorch/Python.
+- [x] Stable softmax/log-softmax and cross entropy, including finite-difference gradients.
+- [ ] Full model/optimizer checkpointing and broader gradient checks. A versioned **dense-parameter-only** format is implemented.
 - [ ] Fully validated DQN with broader RL tasks and controlled multi-seed evaluation.
 - [ ] Row-major blocked GEMM, compiler vectorization and bounds-check analysis.
 - [ ] Dedicated hardware benchmarks: Clang/GCC, BLAS, throughput and memory.
-- [ ] Fair adapter-matched CBLAS comparison with wider matrix dimensions.
+- [x] Adapter-matched CBLAS control for 32/64/128 square GEMM; [report](../benchmarks/reports/2026-11-05-blas-adapter-matched.md). Wider shapes and controlled timing remain outstanding.
 - [ ] Parallel environment collection and replay throughput study.
 - [ ] CPU implementation release packaging and compatibility matrix.
 
