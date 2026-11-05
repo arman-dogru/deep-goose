@@ -109,6 +109,24 @@ jobs:
             --implementations goose,c,python_loop,numpy,torch_cpu \
             --trials 3 --output benchmarks/reports/training-ci
 
+      - name: Compile Adam training baselines
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check examples/regression/adam.goose
+          goose build --cc clang -o build/goose_adam_train examples/regression/adam.goose
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Wall -Wextra -Werror -o build/c_adam_train benchmarks/c/regression_adam.c -lm
+
+      - name: Validate and compare Adam CPU training
+        run: |
+          python3 benchmarks/runner/train_compare.py \
+            --optimizer adam \
+            --goose build/goose_adam_train \
+            --c build/c_adam_train \
+            --implementations goose,c,python_loop,numpy,torch_cpu \
+            --trials 3 --output benchmarks/reports/adam-ci
+
       - name: Validate tabular RL in Goose and compare C/Python
         shell: bash
         run: |
@@ -157,4 +175,5 @@ jobs:
           path: |
             benchmarks/reports/ci/
             benchmarks/reports/training-ci/
+            benchmarks/reports/adam-ci/
           if-no-files-found: warn
