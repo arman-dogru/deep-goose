@@ -76,6 +76,14 @@ jobs:
           goose build --cc clang -o build/classification_test tests/goose/classification.goose
           ./build/classification_test
 
+      - name: Verify multiclass CPU classification learning
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check examples/classification/train.goose
+          goose build --cc clang -o build/goose_classification_train examples/classification/train.goose
+          ./build/goose_classification_train
+
       - name: Test analytical gradients and nonlinear XOR training
         shell: bash
         run: |
