@@ -1,0 +1,6 @@
+build/
+__pycache__/
+*.pyc
+benchmarks/reports/ci/
+benchmarks/reports/adam-ci/
+benchmarks/reports/training-ci/
