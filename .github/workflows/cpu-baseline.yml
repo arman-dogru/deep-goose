@@ -61,6 +61,17 @@ jobs:
           goose build --cc clang -o build/cpu_ops_test tests/goose/cpu_ops.goose
           ./build/cpu_ops_test
 
+      - name: Test analytical gradients and nonlinear XOR training
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check tests/goose/gradient_check.goose
+          goose build --cc clang -o build/goose_gradient_check tests/goose/gradient_check.goose
+          ./build/goose_gradient_check
+          goose check examples/xor/train.goose
+          goose build --cc clang -o build/goose_xor_train examples/xor/train.goose
+          ./build/goose_xor_train
+
       - name: Compile C baseline
         run: |
           clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
