@@ -15,6 +15,7 @@
 - [Native DQN training](benchmarks/reports/2026-11-05-dqn-lineworld.md) — CPU DQN learning and greedy evaluation.
 - [Adam and multiclass training](benchmarks/reports/2026-11-05-adam-and-classification.md) — five-implementation optimizer comparison, classification, checkpoint validation.
 - [Matched BLAS adapter comparison](benchmarks/reports/2026-11-05-blas-adapter-matched.md) — Goose vs C through the exact same C adapter.
+- [GEMM optimization and compiler diagnostics](benchmarks/reports/2026-11-05-gemm-optimization.md) — matched C and Goose loop orders, row slicing, blocking, Clang vectorization and bounds checks.
 
 All reported GitHub-hosted benchmark numbers are **exploratory**. Dedicated hardware is required for publication-quality performance claims.
 
@@ -22,7 +23,7 @@ All reported GitHub-hosted benchmark numbers are **exploratory**. Dedicated hard
 
 | Component | Current implementation |
 |---|---|
-| CPU tensor operations | Contiguous row-major `f32` storage, add, fill, dot, GEMM, ReLU |
+| CPU tensor operations | Contiguous row-major `f32` storage, add, fill, dot, **row-sliced GEMM**, ReLU |
 | Neural networks | Dense forward, dense backward, ReLU backward, MSE and derivative; stable softmax/log-softmax/cross-entropy |
 | Optimizers | SGD and Adam primitive with explicit first/second moments |
 | CPU training | Synthetic regression with SGD or Adam; nonlinear XOR MLP; three-class softmax classifier |
@@ -109,6 +110,6 @@ Do **not** generalize a tiny XOR/regression or shared-runner timing to large-mod
 
 ## Contributing and scope
 
-The [engineering plan](ENGINEERING_PLAN.md) prioritizes reproducible CPU measurements and correctness before the CUDA phase. The immediate next CPU work includes wider matrix shapes, blocked GEMM and profiler diagnostics, an adapter-matched CBLAS control, fully validated Adam training, stronger deterministic tests, and deep RL benchmarks against equivalent Python/C implementations.
+The [engineering plan](ENGINEERING_PLAN.md) prioritizes reproducible CPU measurements and correctness before the CUDA phase. The GEMM investigation has implemented row-sliced native multiplication and found that basic 32³ blocking is slower than row traversal; compiler diagnostics and a reproducible benchmark are committed. Next work includes more complete numerical validation, tuned GEMM microkernels, controlled CPU profiling, larger MLP benchmarks and deep RL comparisons against equivalent Python/C implementations.
 
 CUDA is deliberately not included in the CPU package dependencies.
