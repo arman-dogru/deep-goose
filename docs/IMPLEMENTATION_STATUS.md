@@ -9,14 +9,15 @@
 | Native CPU elementwise / dot / GEMM | [cpu.goose](../src/ops/cpu.goose) | [cpu_ops.goose](../tests/goose/cpu_ops.goose); [row-sliced GEMM shape tests](../tests/goose/matmul_shapes.goose) |
 | Matched GEMM algorithm and compiler investigation | [six kernel variants](../benchmarks/goose/gemm_study.goose) and [matched C](../benchmarks/c/gemm_study.c) | [GEMM report](../benchmarks/reports/2026-11-05-gemm-optimization.md); [register-blocking negative result](../benchmarks/reports/2026-11-05-register-microkernels.md) and [passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42085836403) |
 | Optimized dense forward with row slices | [cpu.goose](../src/ops/cpu.goose) and [dense-shape tests](../tests/goose/dense_shapes.goose) | [Passing matched Goose/C benchmark](https://github.com/arman-dogru/deep-goose/actions/runs/42086561338): 168 checked executions; [full CPU regression CI](https://github.com/arman-dogru/deep-goose/actions/runs/42086819316); [report](../benchmarks/reports/2026-11-05-dense-forward-optimization.md) |
-| Dense forward / backward, MSE and SGD | [cpu.goose](../src/ops/cpu.goose) | Tensor unit test; regression-learning test |
+| Optimized dense backward with row slices | [cpu.goose](../src/ops/cpu.goose) · [complete-gradient tests](../tests/goose/dense_backward_shapes.goose) | [Passing matched Goose/C benchmark](https://github.com/arman-dogru/deep-goose/actions/runs/42088202217): 282 numerical checks, zero failures; [passing full CPU CI](https://github.com/arman-dogru/deep-goose/actions/runs/42088544354); [report](../benchmarks/reports/2026-11-05-dense-backward-optimization.md) |
+| Dense MSE and SGD | [cpu.goose](../src/ops/cpu.goose) | Tensor unit test; regression-learning test |
 | Adam optimizer primitive | [cpu.goose](../src/ops/cpu.goose) | First-step moment and parameter check |
 | Stable softmax, log-softmax and cross-entropy | [classification.goose](../src/ops/classification.goose) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42060092564): extreme-logit and finite-difference tests |
 | Multiclass dense-layer training | [training example](../examples/classification/train.goose) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42061275452): 90/90 correct, MSE not applicable, cross-entropy 0.01633 |
 | Versioned dense-parameter checkpoints (weights/bias only) | [checkpoint.goose](../src/nn/checkpoint.goose) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42061959784): roundtrip and malformed-file rejection |
 | Full Adam regression training, five implementations | [Goose](../examples/regression/adam.goose) and [comparison runner](../benchmarks/runner/train_compare.py) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42060658305): all converged |
 | BLAS adapter-matched C comparison | [benchmark](../benchmarks/c/blas_bench.c) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42061105147) and [report](../benchmarks/reports/2026-11-05-blas-adapter-matched.md) |
-| Dense weight/bias numerical gradients | [gradient_check.goose](../tests/goose/gradient_check.goose) | Central finite-difference checks |
+| Dense input/weight/bias numerical gradients | [gradient_check.goose](../tests/goose/gradient_check.goose) | Central finite-difference checks for dX, dW, and db |
 | Nonlinear 2→8→1 ReLU training | [XOR example](../examples/xor/train.goose) | Loss below 1e-4; [passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42055780379) |
 | Tabular Q-learning and replay | [tabular.goose](../src/rl/tabular.goose) | Unit tests |
 | Tabular LineWorld learning in Goose/C/Python | [Goose](../examples/rl/lineworld.goose) · [C](../benchmarks/c/lineworld.c) · [Python](../benchmarks/python/lineworld.py) | Identical 23,116 transitions; optimal 7-step policy; [passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42058069523) |
@@ -43,6 +44,7 @@
 9. [Native GEMM loop-order, blocking and codegen investigation](../benchmarks/reports/2026-11-05-gemm-optimization.md).
 10. [Register-blocked GEMM experiments, not adopted](../benchmarks/reports/2026-11-05-register-microkernels.md).
 11. [Dense forward optimized with row-sliced traversal](../benchmarks/reports/2026-11-05-dense-forward-optimization.md).
+12. [Dense backward optimized with row-sliced gradients](../benchmarks/reports/2026-11-05-dense-backward-optimization.md).
 
 All current timings originate from GitHub-hosted CPU VMs. These numbers are **exploratory and unsuitable for publication-grade speedup claims**. Many have only 3 trials, and model/task dimensions are small. The latest BLAS report also identifies overhead remaining between Goose and C calling the same library.
 
