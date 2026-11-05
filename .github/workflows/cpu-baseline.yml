@@ -101,6 +101,18 @@ jobs:
             --implementations goose,c,python_loop,numpy,torch_cpu \
             --trials 3 --output benchmarks/reports/training-ci
 
+      - name: Validate tabular RL in Goose and compare C/Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check examples/rl/lineworld.goose
+          goose build --cc clang -o build/goose_lineworld examples/rl/lineworld.goose
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Wall -Wextra -Werror -o build/c_lineworld benchmarks/c/lineworld.c
+          ./build/goose_lineworld
+          ./build/c_lineworld
+          python3 benchmarks/python/lineworld.py
+
       - name: Compile BLAS-backed baselines
         shell: bash
         run: |
