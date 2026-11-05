@@ -11,6 +11,7 @@
 - [Independent-process runner](../runner/compare_dense.py)
 - [Optimized library implementation](../../src/ops/cpu.goose)
 - [Public API elementwise shape tests](../../tests/goose/dense_shapes.goose)
+- [Passing full CPU regression suite after library integration](https://github.com/arman-dogru/deep-goose/actions/runs/42086819316)
 
 **Performance qualification:** all timings below are measurements on a GitHub-hosted virtual CPU, not a controlled hardware system. Compare algorithms within the same run, rather than treating microsecond differences as reproducible hardware facts.
 
@@ -64,6 +65,7 @@ The updated Goose function is close to the matched C row-slice implementation in
 - Reference validation is applied **element by element**, not via checksum alone.
 - Shapes include singleton batch, odd dimensions and larger batch/feature counts.
 - The public library now additionally has `tests/goose/dense_shapes.goose`, covering non-square dimensions and repeated writes to the same output.
+- The integrated public API passed the full CPU CI workflow, including regression, Adam, XOR, classification, gradient checking, tabular Q-learning and native DQN.
 
 ### Compiler evidence
 
