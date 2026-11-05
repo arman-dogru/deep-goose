@@ -28,6 +28,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install numpy
+          python3 -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install pinned Goose v2026.3
         shell: bash
@@ -52,9 +53,17 @@ jobs:
           goose check benchmarks/goose/cpu_bench.goose
           goose build --cc clang -o build/goose_cpu_bench benchmarks/goose/cpu_bench.goose
 
+      - name: Compile and execute Goose library regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check tests/goose/cpu_ops.goose
+          goose build --cc clang -o build/cpu_ops_test tests/goose/cpu_ops.goose
+          ./build/cpu_ops_test
+
       - name: Compile C baseline
         run: |
-          cc -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
             -Wall -Wextra -Werror -o build/c_cpu_bench benchmarks/c/cpu_bench.c
 
       - name: Run reproducible smoke benchmarks
@@ -62,7 +71,7 @@ jobs:
           python3 benchmarks/runner/compare.py \
             --goose build/goose_cpu_bench \
             --c build/c_cpu_bench \
-            --implementations goose,c,python_loop,numpy \
+            --implementations goose,c,python_loop,numpy,torch_cpu \
             --mode smoke --trials 3 \
             --output benchmarks/reports/ci
 
