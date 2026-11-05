@@ -76,6 +76,14 @@ jobs:
           goose build --cc clang -o build/matmul_shapes tests/goose/matmul_shapes.goose
           ./build/matmul_shapes
 
+      - name: Validate optimized dense forward across shapes and repeated calls
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check tests/goose/dense_shapes.goose
+          goose build --cc clang -o build/dense_shapes tests/goose/dense_shapes.goose
+          ./build/dense_shapes
+
       - name: Validate numerically stable classification operators
         shell: bash
         run: |
