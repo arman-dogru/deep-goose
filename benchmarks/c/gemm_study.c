@@ -110,8 +110,8 @@ int main(int argc, char **argv) {
         return 2;
     }
     for (size_t i = 0; i < count; ++i) {
-        a[i] = ((float)(i % 257) - 128.0f) * 0.0078125f;
-        b[i] = ((float)(i % 199) - 99.0f) * 0.015625f;
+        a[i] = ((float)(i % 257) - 128.0f) * 0.00713f;
+        b[i] = ((float)(i % 199) - 99.0f) * 0.01517f;
         c[i] = 0.0f;
     }
     perform(a, b, c, n, variant);
