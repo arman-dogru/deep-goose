@@ -6,7 +6,8 @@
 
 | Item | Source | Validation |
 |---|---|---|
-| Native CPU elementwise / dot / GEMM | [cpu.goose](../src/ops/cpu.goose) | [cpu_ops.goose](../tests/goose/cpu_ops.goose) |
+| Native CPU elementwise / dot / GEMM | [cpu.goose](../src/ops/cpu.goose) | [cpu_ops.goose](../tests/goose/cpu_ops.goose); [row-sliced GEMM shape tests](../tests/goose/matmul_shapes.goose) |
+| Matched GEMM algorithm and compiler investigation | [four implementations](../benchmarks/goose/gemm_study.goose) and [independent C](../benchmarks/c/gemm_study.c) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42083819305): 944 execution records, zero errors; [complete report](../benchmarks/reports/2026-11-05-gemm-optimization.md) |
 | Dense forward / backward, MSE and SGD | [cpu.goose](../src/ops/cpu.goose) | Tensor unit test; regression-learning test |
 | Adam optimizer primitive | [cpu.goose](../src/ops/cpu.goose) | First-step moment and parameter check |
 | Stable softmax, log-softmax and cross-entropy | [classification.goose](../src/ops/classification.goose) | [Passing CI](https://github.com/arman-dogru/deep-goose/actions/runs/42060092564): extreme-logit and finite-difference tests |
@@ -38,6 +39,7 @@
 6. [Tabular RL comparison](../benchmarks/reports/2026-11-05-lineworld.md).
 7. [Native CPU DQN training](../benchmarks/reports/2026-11-05-dqn-lineworld.md).
 8. [Adapter-matched Goose/C OpenBLAS](../benchmarks/reports/2026-11-05-blas-adapter-matched.md).
+9. [Native GEMM loop-order, blocking and codegen investigation](../benchmarks/reports/2026-11-05-gemm-optimization.md).
 
 All current timings originate from GitHub-hosted CPU VMs. These numbers are **exploratory and unsuitable for publication-grade speedup claims**. Many have only 3 trials, and model/task dimensions are small. The latest BLAS report also identifies overhead remaining between Goose and C calling the same library.
 
@@ -49,7 +51,7 @@ All current timings originate from GitHub-hosted CPU VMs. These numbers are **ex
 - [x] Stable softmax/log-softmax and cross entropy, including finite-difference gradients.
 - [ ] Full model/optimizer checkpointing and broader gradient checks. A versioned **dense-parameter-only** format is implemented.
 - [ ] Fully validated DQN with broader RL tasks and controlled multi-seed evaluation.
-- [ ] Row-major blocked GEMM, compiler vectorization and bounds-check analysis.
+- [x] Compare naive, row-reordered, blocked and row-sliced GEMM with vectorization/BCE diagnostics. **Result:** row-sliced wins among these Goose kernels; the current 32³ blocking loses. Further tuned microkernel work remains.
 - [ ] Dedicated hardware benchmarks: Clang/GCC, BLAS, throughput and memory.
 - [x] Adapter-matched CBLAS control for 32/64/128 square GEMM; [report](../benchmarks/reports/2026-11-05-blas-adapter-matched.md). Wider shapes and controlled timing remain outstanding.
 - [ ] Parallel environment collection and replay throughput study.
