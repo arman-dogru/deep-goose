@@ -96,9 +96,7 @@ jobs:
           python3 benchmarks/runner/train_compare.py \
             --goose build/goose_regression_train \
             --c build/c_regression_train \
-            --goose-blas build/goose_blas_bench \
-            --c-blas build/c_blas_bench \
-            --implementations goose,c,python_loop,numpy,torch_cpu,goose_blas,c_blas \
+            --implementations goose,c,python_loop,numpy,torch_cpu \
             --trials 3 --output benchmarks/reports/training-ci
 
       - name: Compile BLAS-backed baselines
