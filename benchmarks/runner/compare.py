@@ -25,6 +25,7 @@ SPECS = {
         ("add", 1024, 200), ("relu", 1024, 200), ("dot", 1024, 200),
         ("add", 65536, 10), ("relu", 65536, 10), ("dot", 65536, 10),
         ("matmul", 32, 3), ("matmul", 64, 2), ("matmul", 128, 1),
+        ("matmul_ikj", 32, 3), ("matmul_ikj", 64, 2), ("matmul_ikj", 128, 1),
     ],
     "full": [
         ("add", 1024, 1000), ("relu", 1024, 1000), ("dot", 1024, 1000),
@@ -32,6 +33,8 @@ SPECS = {
         ("add", 1048576, 5), ("relu", 1048576, 5), ("dot", 1048576, 5),
         ("matmul", 32, 10), ("matmul", 64, 5),
         ("matmul", 128, 3), ("matmul", 256, 1),
+        ("matmul_ikj", 32, 10), ("matmul_ikj", 64, 5),
+        ("matmul_ikj", 128, 3), ("matmul_ikj", 256, 1),
     ],
 }
 ALL_IMPLS = ("goose", "c", "python_loop", "numpy", "torch_cpu")
@@ -97,7 +100,7 @@ def parse_result(stdout, expected_impl, op, n, iters):
 def checksum_ok(op, n, expected, actual):
     # Aggregate checksums are only a smoke test, NOT elementwise correctness.
     # GEMM and dot can differ due to f32 accumulation and FMA/BLAS order.
-    atol = (0.1 if op == "dot" else (0.02 if op == "matmul" else 0.001))
+    atol = (0.1 if op == "dot" else (0.02 if op.startswith("matmul") else 0.001))
     rtol = (0.015 if op == "dot" else 0.0005)
     return math.isclose(actual, expected, rel_tol=rtol, abs_tol=atol)
 
@@ -112,14 +115,14 @@ def run(args):
         if impl in implementations and not exe.is_file():
             raise SystemExit(f"{impl} executable not found: {exe}")
     cases = [(op,n,iters) for op,n,iters in SPECS[args.mode]
-             if n <= args.max_vector_size or op == "matmul"]
+             if n <= args.max_vector_size or op.startswith("matmul")]
     records = []
     failures = []
     rng = random.Random(20261105)
     for op,n,iters in cases:
         selected = [
             impl for impl in implementations
-            if not (impl == "python_loop" and ((op == "matmul" and n > 64) or (op != "matmul" and n > 65536)))
+            if not (impl == "python_loop" and ((op.startswith("matmul") and n > 64) or (not op.startswith("matmul") and n > 65536)))
         ]
         # Compare programming-language performance with randomized process order.
         for trial in range(args.trials):

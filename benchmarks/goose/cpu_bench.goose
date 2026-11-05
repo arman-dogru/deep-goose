@@ -1,5 +1,5 @@
 // Matched numerical kernels for the Deep Goose CPU baseline.
-// Usage: ./cpu_bench <add|relu|dot|matmul> <n> <iterations>
+// Usage: ./cpu_bench <add|relu|dot|matmul|matmul_ikj> <n> <iterations>
 // A complete result line has the form RESULT,goose,operation,n,iterations,ns,checksum.
 // Allocation, deterministic input construction, warmup and checksum are not timed.
 import std;
@@ -38,6 +38,21 @@ fn matrix_multiply(a: const f32[:], b: const f32[:], out: f32[:], n: i64) {
     }
 }
 
+// Cache-friendlier row-major GEMM. Summation order per C[i,j] remains k ascending.
+fn matrix_multiply_ikj(a: const f32[:], b: const f32[:], out: f32[:], n: i64) {
+    for pos in 0..out.len {
+        out[pos] = 0.0;
+    }
+    for i in 0..n {
+        for k in 0..n {
+            let v = a[i * n + k];
+            for j in 0..n {
+                out[i * n + j] += v * b[k * n + j];
+            }
+        }
+    }
+}
+
 fn main() {
     let argv = args();
     guard argv.len == 4 else {
@@ -51,13 +66,13 @@ fn main() {
         print("invalid benchmark dimensions / iterations");
         exit(2);
     }
-    guard op == "add" || op == "relu" || op == "dot" || op == "matmul" else {
+    guard op == "add" || op == "relu" || op == "dot" || (op == "matmul" || op == "matmul_ikj") else {
         print("unknown operation");
         exit(2);
     }
 
     // Matmul is intentionally square in the initial matched benchmark.
-    let count = if op == "matmul" { n * n } else { n };
+    let count = if (op == "matmul" || op == "matmul_ikj") { n * n } else { n };
     var a: f32[>..] = [];
     var b: f32[>..] = [];
     var out: f32[>..] = [];
@@ -76,7 +91,11 @@ fn main() {
     } else if op == "dot" {
         last_dot = vector_dot(a, b);
     } else {
-        matrix_multiply(a, b, out, n);
+        if op == "matmul_ikj" {
+            matrix_multiply_ikj(a, b, out, n);
+        } else {
+            matrix_multiply(a, b, out, n);
+        }
     }
 
     let before = clock_ns();
@@ -88,7 +107,11 @@ fn main() {
         } else if op == "dot" {
             last_dot = vector_dot(a, b);
         } else {
+            if op == "matmul_ikj" {
+            matrix_multiply_ikj(a, b, out, n);
+        } else {
             matrix_multiply(a, b, out, n);
+        }
         }
     }
     let elapsed_ns = clock_ns() - before;

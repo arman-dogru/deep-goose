@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pure Python, NumPy, PyTorch CPU baseline; output matches the C/Goose CSV schema.
 
-Usage: python cpu_bench.py <python_loop|numpy|torch_cpu> <add|relu|dot|matmul> <n> <iterations>
+Usage: python cpu_bench.py <python_loop|numpy|torch_cpu> <add|relu|dot|matmul|matmul_ikj> <n> <iterations>
 The timed region excludes input initialization, warmup, and checksum.
 Python loop arithmetic uses double-precision Python floats rather than strict f32.
 NumPy/PyTorch reductions and GEMM use their optimized implementation; this is
@@ -35,6 +35,15 @@ def python_kernel(op: str, a: list[float], b: list[float], out: list[float], n: 
         for i in range(n):
             s += a[i] * b[i]
         return s
+    if op == "matmul_ikj":
+        for pos in range(n*n):
+            out[pos] = 0.0
+        for i in range(n):
+            for k in range(n):
+                v = a[i*n+k]
+                for j in range(n):
+                    out[i*n+j] += v*b[k*n+j]
+        return None
     if op == "matmul":
         for i in range(n):
             for j in range(n):
@@ -47,7 +56,7 @@ def python_kernel(op: str, a: list[float], b: list[float], out: list[float], n: 
 
 
 def benchmark(impl: str, op: str, n: int, iterations: int) -> None:
-    a_list, b_list = inputs(n, op == "matmul")
+    a_list, b_list = inputs(n, op in ("matmul", "matmul_ikj"))
     count = len(a_list)
     if impl == "python_loop":
         out = [0.0] * count
@@ -60,7 +69,7 @@ def benchmark(impl: str, op: str, n: int, iterations: int) -> None:
         a = np.asarray(a_list, dtype=np.float32)
         b = np.asarray(b_list, dtype=np.float32)
         out = np.empty_like(a)
-        if op == "matmul":
+        if op in ("matmul", "matmul_ikj"):
             a = a.reshape(n, n)
             b = b.reshape(n, n)
             out = out.reshape(n, n)
@@ -88,7 +97,7 @@ def benchmark(impl: str, op: str, n: int, iterations: int) -> None:
         a = torch.tensor(a_list, dtype=torch.float32)
         b = torch.tensor(b_list, dtype=torch.float32)
         out = torch.empty_like(a)
-        if op == "matmul":
+        if op in ("matmul", "matmul_ikj"):
             a = a.reshape(n, n)
             b = b.reshape(n, n)
             out = out.reshape(n, n)
@@ -124,14 +133,14 @@ def benchmark(impl: str, op: str, n: int, iterations: int) -> None:
 
 def main():
     if len(sys.argv) != 5:
-        raise SystemExit("usage: cpu_bench.py <python_loop|numpy|torch_cpu> <add|relu|dot|matmul> <n> <iterations>")
+        raise SystemExit("usage: cpu_bench.py <python_loop|numpy|torch_cpu> <add|relu|dot|matmul|matmul_ikj> <n> <iterations>")
     impl, op, n_raw, iterations_raw = sys.argv[1:]
     n, iterations = int(n_raw), int(iterations_raw)
     if not 0 < n <= 1048576 or not 0 < iterations <= 1048576:
         raise SystemExit("dimensions / iterations outside safety limits")
     if op == "matmul" and n > 4096:
         raise SystemExit("matrix dimension outside safety limit")
-    if op not in {"add", "relu", "dot", "matmul"}:
+    if op not in {"add", "relu", "dot", "matmul", "matmul_ikj"}:
         raise SystemExit(f"unknown operation: {op}")
     benchmark(impl, op, n, iterations)
 
