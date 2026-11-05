@@ -1,5 +1,5 @@
 // Deep Goose: controlled row-major f32 GEMM loop-order / cache-tiling study.
-// CLI: ./gemm_study <ijk|ikj|blocked32|rows> <n> <repetitions>
+// CLI: ./gemm_study <ijk|ikj|blocked32|rows|micro4> <n> <repetitions>
 // Outputs GEMM_RESULT,goose,variant,n,repetitions,elapsed_ns,max_abs_error,checksum
 // Inputs and result validation are outside the timed region.
 // Every output element is checked against a separate f64 reference.
@@ -75,6 +75,108 @@ fn gemm_rows(a: const f32[:], b: const f32[:], c: f32[:], n: i64) {
     }
 }
 
+// 4x4 register-blocked GEMM: accumulate 16 output elements in scalar
+// registers across the complete k dimension and store each output once.
+// Zeroing is timed, as in the row-sliced kernel. Tail rows/columns fall
+// back to the tested row-slice traversal with identical k accumulation.
+fn gemm_micro4(a: const f32[:], b: const f32[:], c: f32[:], n: i64) {
+    for pos in 0..c.len { c[pos] = 0.0; }
+    let tiles = n / 4;
+    let full = tiles * 4;
+    for bi in 0..tiles {
+        let i = bi * 4;
+        let ar0 = a[(i + 0) * n..(i + 0 + 1) * n];
+        let ar1 = a[(i + 1) * n..(i + 1 + 1) * n];
+        let ar2 = a[(i + 2) * n..(i + 2 + 1) * n];
+        let ar3 = a[(i + 3) * n..(i + 3 + 1) * n];
+        for bj in 0..tiles {
+            let j = bj * 4;
+            var s00: f32 = 0.0;
+            var s01: f32 = 0.0;
+            var s02: f32 = 0.0;
+            var s03: f32 = 0.0;
+            var s10: f32 = 0.0;
+            var s11: f32 = 0.0;
+            var s12: f32 = 0.0;
+            var s13: f32 = 0.0;
+            var s20: f32 = 0.0;
+            var s21: f32 = 0.0;
+            var s22: f32 = 0.0;
+            var s23: f32 = 0.0;
+            var s30: f32 = 0.0;
+            var s31: f32 = 0.0;
+            var s32: f32 = 0.0;
+            var s33: f32 = 0.0;
+            for k in 0..n {
+                let br = b[k * n..(k + 1) * n];
+                let v0 = ar0[k];
+                let v1 = ar1[k];
+                let v2 = ar2[k];
+                let v3 = ar3[k];
+                let w0 = br[j + 0];
+                let w1 = br[j + 1];
+                let w2 = br[j + 2];
+                let w3 = br[j + 3];
+                s00 += v0 * w0;
+                s01 += v0 * w1;
+                s02 += v0 * w2;
+                s03 += v0 * w3;
+                s10 += v1 * w0;
+                s11 += v1 * w1;
+                s12 += v1 * w2;
+                s13 += v1 * w3;
+                s20 += v2 * w0;
+                s21 += v2 * w1;
+                s22 += v2 * w2;
+                s23 += v2 * w3;
+                s30 += v3 * w0;
+                s31 += v3 * w1;
+                s32 += v3 * w2;
+                s33 += v3 * w3;
+            }
+            c[(i + 0) * n + j + 0] = s00;
+            c[(i + 0) * n + j + 1] = s01;
+            c[(i + 0) * n + j + 2] = s02;
+            c[(i + 0) * n + j + 3] = s03;
+            c[(i + 1) * n + j + 0] = s10;
+            c[(i + 1) * n + j + 1] = s11;
+            c[(i + 1) * n + j + 2] = s12;
+            c[(i + 1) * n + j + 3] = s13;
+            c[(i + 2) * n + j + 0] = s20;
+            c[(i + 2) * n + j + 1] = s21;
+            c[(i + 2) * n + j + 2] = s22;
+            c[(i + 2) * n + j + 3] = s23;
+            c[(i + 3) * n + j + 0] = s30;
+            c[(i + 3) * n + j + 1] = s31;
+            c[(i + 3) * n + j + 2] = s32;
+            c[(i + 3) * n + j + 3] = s33;
+        }
+    }
+    for i in 0..full {
+        let ar = a[i * n..(i + 1) * n];
+        let cr = c[i * n..(i + 1) * n];
+        for j in full..n {
+            var sum: f32 = 0.0;
+            for k in 0..n {
+                let br = b[k * n..(k + 1) * n];
+                sum += ar[k] * br[j];
+            }
+            cr[j] = sum;
+        }
+    }
+    for i in full..n {
+        let ar = a[i * n..(i + 1) * n];
+        let cr = c[i * n..(i + 1) * n];
+        for k in 0..n {
+            let br = b[k * n..(k + 1) * n];
+            let aik = ar[k];
+            for j in 0..n {
+                cr[j] += aik * br[j];
+            }
+        }
+    }
+}
+
 fn perform(a: const f32[:], b: const f32[:], c: f32[:], n: i64,
            variant: const u8[:]) {
     if variant == "ijk" {
@@ -83,8 +185,10 @@ fn perform(a: const f32[:], b: const f32[:], c: f32[:], n: i64,
         gemm_ikj(a, b, c, n);
     } else if variant == "blocked32" {
         gemm_blocked32(a, b, c, n);
-    } else {
+    } else if variant == "rows" {
         gemm_rows(a, b, c, n);
+    } else {
+        gemm_micro4(a, b, c, n);
     }
 }
 
@@ -97,7 +201,7 @@ fn main() {
     let variant = argv[1];
     let n, ok_n = parse_int(argv[2]);
     let repetitions, ok_reps = parse_int(argv[3]);
-    guard (variant == "ijk" || variant == "ikj" || variant == "blocked32" || variant == "rows") &&
+    guard (variant == "ijk" || variant == "ikj" || variant == "blocked32" || variant == "rows" || variant == "micro4") &&
           ok_n && ok_reps && n >= 1 && n <= 256 &&
           repetitions > 0 && repetitions <= 10000 else {
         print("invalid GEMM study arguments");

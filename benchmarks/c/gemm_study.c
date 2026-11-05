@@ -1,6 +1,6 @@
 // Matched f32 GEMM study for Goose benchmarks/goose/gemm_study.goose.
 // clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror
-// CLI: ./gemm_study <ijk|ikj|blocked32|rows> <n> <repetitions>
+// CLI: ./gemm_study <ijk|ikj|blocked32|rows|micro4> <n> <repetitions>
 // Output: GEMM_RESULT,c,variant,n,repetitions,elapsed_ns,max_abs_error,checksum
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
@@ -71,12 +71,107 @@ static void gemm_rows(const float *a, const float *b, float *c, size_t n) {
     }
 }
 
+// Four-by-four register blocking. Every output follows k-ascending
+// accumulation; rows/columns not divisible by four use row traversal.
+static void gemm_micro4(const float *a, const float *b, float *c, size_t n) {
+    for (size_t pos=0; pos<n*n; ++pos) c[pos] = 0.0f;
+    const size_t tiles = n/4, full = tiles*4;
+    for (size_t bi=0; bi<tiles; ++bi) {
+        const size_t i=bi*4;
+        const float *ar0 = a + (i+0)*n;
+        const float *ar1 = a + (i+1)*n;
+        const float *ar2 = a + (i+2)*n;
+        const float *ar3 = a + (i+3)*n;
+        for (size_t bj=0; bj<tiles; ++bj) {
+            const size_t j=bj*4;
+            float s00 = 0.0f;
+            float s01 = 0.0f;
+            float s02 = 0.0f;
+            float s03 = 0.0f;
+            float s10 = 0.0f;
+            float s11 = 0.0f;
+            float s12 = 0.0f;
+            float s13 = 0.0f;
+            float s20 = 0.0f;
+            float s21 = 0.0f;
+            float s22 = 0.0f;
+            float s23 = 0.0f;
+            float s30 = 0.0f;
+            float s31 = 0.0f;
+            float s32 = 0.0f;
+            float s33 = 0.0f;
+            for (size_t k=0; k<n; ++k) {
+                const float *br = b+k*n;
+                const float v0 = ar0[k];
+                const float v1 = ar1[k];
+                const float v2 = ar2[k];
+                const float v3 = ar3[k];
+                const float w0 = br[j+0];
+                const float w1 = br[j+1];
+                const float w2 = br[j+2];
+                const float w3 = br[j+3];
+                s00 += v0*w0;
+                s01 += v0*w1;
+                s02 += v0*w2;
+                s03 += v0*w3;
+                s10 += v1*w0;
+                s11 += v1*w1;
+                s12 += v1*w2;
+                s13 += v1*w3;
+                s20 += v2*w0;
+                s21 += v2*w1;
+                s22 += v2*w2;
+                s23 += v2*w3;
+                s30 += v3*w0;
+                s31 += v3*w1;
+                s32 += v3*w2;
+                s33 += v3*w3;
+            }
+            c[(i+0)*n+j+0] = s00;
+            c[(i+0)*n+j+1] = s01;
+            c[(i+0)*n+j+2] = s02;
+            c[(i+0)*n+j+3] = s03;
+            c[(i+1)*n+j+0] = s10;
+            c[(i+1)*n+j+1] = s11;
+            c[(i+1)*n+j+2] = s12;
+            c[(i+1)*n+j+3] = s13;
+            c[(i+2)*n+j+0] = s20;
+            c[(i+2)*n+j+1] = s21;
+            c[(i+2)*n+j+2] = s22;
+            c[(i+2)*n+j+3] = s23;
+            c[(i+3)*n+j+0] = s30;
+            c[(i+3)*n+j+1] = s31;
+            c[(i+3)*n+j+2] = s32;
+            c[(i+3)*n+j+3] = s33;
+        }
+    }
+    for (size_t i=0; i<full; ++i) {
+        const float *ar=a+i*n;
+        float *cr=c+i*n;
+        for (size_t j=full; j<n; ++j) {
+            float sum=0.0f;
+            for (size_t k=0; k<n; ++k) sum+=ar[k]*b[k*n+j];
+            cr[j]=sum;
+        }
+    }
+    for (size_t i=full; i<n; ++i) {
+        const float *ar=a+i*n;
+        float *cr=c+i*n;
+        for (size_t k=0; k<n; ++k) {
+            const float *br=b+k*n;
+            const float aik=ar[k];
+            for (size_t j=0; j<n; ++j) cr[j]+=aik*br[j];
+        }
+    }
+}
+
 static void perform(const float *a, const float *b, float *c, size_t n,
                     const char *variant) {
     if (strcmp(variant, "ijk") == 0) gemm_ijk(a, b, c, n);
     else if (strcmp(variant, "ikj") == 0) gemm_ikj(a, b, c, n);
     else if (strcmp(variant, "blocked32") == 0) gemm_blocked32(a, b, c, n);
-    else gemm_rows(a, b, c, n);
+    else if (strcmp(variant, "rows") == 0) gemm_rows(a, b, c, n);
+    else gemm_micro4(a, b, c, n);
 }
 
 static long parse_arg(const char *raw, long limit) {
@@ -93,8 +188,8 @@ static long parse_arg(const char *raw, long limit) {
 int main(int argc, char **argv) {
     if (argc != 4 ||
         (strcmp(argv[1], "ijk") && strcmp(argv[1], "ikj") &&
-         strcmp(argv[1], "blocked32") && strcmp(argv[1], "rows"))) {
-        fprintf(stderr, "usage: gemm_study <ijk|ikj|blocked32|rows> <n> <repetitions>\n");
+         strcmp(argv[1], "blocked32") && strcmp(argv[1], "rows") && strcmp(argv[1], "micro4"))) {
+        fprintf(stderr, "usage: gemm_study <ijk|ikj|blocked32|rows|micro4> <n> <repetitions>\n");
         return 2;
     }
     const char *variant = argv[1];
