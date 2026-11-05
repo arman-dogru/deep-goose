@@ -1,0 +1,79 @@
+name: Dense backward CPU investigation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dense-backward.yml"
+      - "benchmarks/goose/backward_study.goose"
+      - "benchmarks/c/backward_study.c"
+      - "benchmarks/runner/compare_backward.py"
+  workflow_dispatch:
+
+jobs:
+  compare-backward:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Goose v2026.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 \
+            https://github.com/aardappel/goose/releases/download/v2026.3/goose-v2026.3-linux-x64.tar.gz \
+            -o /tmp/goose.tar.gz
+          mkdir -p /tmp/goose-dist
+          tar -xzf /tmp/goose.tar.gz -C /tmp/goose-dist
+          GOOSE_EXE="$(find /tmp/goose-dist -type f -name goose -print -quit)"
+          test -n "$GOOSE_EXE"
+          chmod +x "$GOOSE_EXE"
+          echo "$(dirname "$GOOSE_EXE")" >> "$GITHUB_PATH"
+          "$GOOSE_EXE" version
+
+      - name: Compile matched Goose/C backward kernels
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build benchmarks/reports/backward-codegen
+          goose check benchmarks/goose/backward_study.goose
+          goose build --cc clang -o build/goose_backward_study \
+            benchmarks/goose/backward_study.goose
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Wall -Wextra -Werror -o build/c_backward_study \
+            benchmarks/c/backward_study.c -lm
+          goose check benchmarks/goose/backward_study.goose --bce-lines \
+            > benchmarks/reports/backward-codegen/goose-bounds-checks.txt 2>&1
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Rpass=loop-vectorize -Rpass-missed=loop-vectorize \
+            -c benchmarks/c/backward_study.c -o build/c_backward_study_remarks.o \
+            > benchmarks/reports/backward-codegen/c-vectorization.txt 2>&1
+          lscpu > benchmarks/reports/backward-codegen/lscpu.txt
+
+      - name: Validate gradients across small and irregular shapes
+        run: |
+          python3 benchmarks/runner/compare_backward.py \
+            --goose build/goose_backward_study \
+            --c build/c_backward_study \
+            --mode smoke --trials 3 \
+            --output benchmarks/reports/backward-smoke
+
+      - name: Compare representative dense backward workloads
+        run: |
+          python3 benchmarks/runner/compare_backward.py \
+            --goose build/goose_backward_study \
+            --c build/c_backward_study \
+            --mode study --trials 5 \
+            --output benchmarks/reports/backward-study
+
+      - name: Preserve raw evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dense-backward-investigation
+          path: |
+            benchmarks/reports/backward-codegen/
+            benchmarks/reports/backward-smoke/
+            benchmarks/reports/backward-study/
+          if-no-files-found: warn
