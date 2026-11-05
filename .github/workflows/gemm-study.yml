@@ -97,6 +97,27 @@ jobs:
             --mode study --trials 5 \
             --output benchmarks/reports/gemm-study
 
+      - name: Check Goose language-level O2 optimization
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUTPUT="benchmarks/reports/gemm-codegen"
+          goose check benchmarks/goose/gemm_study.goose -O2 --bce-lines \
+            > "$OUTPUT/goose-O2-bounds-checks.txt" 2>&1
+          goose build --cc clang -O2 -o build/goose_gemm_study_o2 \
+            benchmarks/goose/gemm_study.goose
+          objdump -d -C build/goose_gemm_study_o2 \
+            > "$OUTPUT/goose-O2-disassembly.txt"
+
+      - name: Compare optimized Goose O2 against the same C baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 benchmarks/runner/compare_gemm.py \
+            --goose build/goose_gemm_study_o2 --c build/c_gemm_study \
+            --mode study --trials 5 \
+            --output benchmarks/reports/gemm-study-goose-O2
+
       - name: Upload raw evidence and codegen diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -105,5 +126,6 @@ jobs:
           path: |
             benchmarks/reports/gemm-smoke/
             benchmarks/reports/gemm-study/
+            benchmarks/reports/gemm-study-goose-O2/
             benchmarks/reports/gemm-codegen/
           if-no-files-found: warn
