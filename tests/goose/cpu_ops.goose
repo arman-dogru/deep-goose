@@ -77,5 +77,16 @@ fn main() {
     deep_goose::sgd_step_f32(a, x, 0.1);
     assert(near(a[0], 1.9, 0.00001));
 
+    var adam_params: f32[2] = [1.0, -1.0];
+    let adam_grad: f32[2] = [2.0, -2.0];
+    var adam_m: f32[2] = [0.0; 2];
+    var adam_v: f32[2] = [0.0; 2];
+    deep_goose::adam_step_f32(adam_params, adam_grad, adam_m, adam_v,
+                              0.001, 0.9, 0.999, 0.1, 0.001, 0.00000001);
+    assert(near(adam_m[0], 0.2, 0.00001));
+    assert(near(adam_v[0], 0.004, 0.00001));
+    assert(near(adam_params[0], 0.999, 0.00001));
+    assert(near(adam_params[1], -0.999, 0.00001));
+
     print("PASS deep_goose CPU tensor, dense forward/backward, Q-learning, replay");
 }

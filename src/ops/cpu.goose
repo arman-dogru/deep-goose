@@ -1,3 +1,4 @@
+import math;
 // Dependency-free CPU numerical operations and a simple caller-owned 2D tensor.
 // All kernels work on contiguous row-major f32 storage.
 namespace deep_goose;
@@ -149,5 +150,29 @@ fn sgd_step_f32(parameters: f32[:], gradients: const f32[:], learning_rate: f32)
     assert(learning_rate > 0.0);
     for i in 0..parameters.len {
         parameters[i] -= learning_rate * gradients[i];
+    }
+}
+
+ 
+// One Adam update with externally tracked bias-correction denominators.
+// Callers advance time and compute 1-beta1^t, 1-beta2^t. These arguments
+// must correspond to the same optimization step for every parameter group.
+fn adam_step_f32(parameters: f32[:], gradients: const f32[:],
+                 first_moment: f32[:], second_moment: f32[:],
+                 learning_rate: f32, beta1: f32, beta2: f32,
+                 correction1: f32, correction2: f32, epsilon: f32) {
+    assert(parameters.len == gradients.len &&
+           gradients.len == first_moment.len &&
+           first_moment.len == second_moment.len);
+    assert(learning_rate > 0.0 && beta1 >= 0.0 && beta1 < 1.0);
+    assert(beta2 >= 0.0 && beta2 < 1.0 && correction1 > 0.0 && correction2 > 0.0);
+    assert(epsilon > 0.0);
+    for i in 0..parameters.len {
+        let g = gradients[i];
+        first_moment[i] = beta1 * first_moment[i] + (1.0 - beta1) * g;
+        second_moment[i] = beta2 * second_moment[i] + (1.0 - beta2) * g * g;
+        let mean = first_moment[i] / correction1;
+        let variance = second_moment[i] / correction2;
+        parameters[i] -= learning_rate * mean / (sqrt(variance) + epsilon);
     }
 }
