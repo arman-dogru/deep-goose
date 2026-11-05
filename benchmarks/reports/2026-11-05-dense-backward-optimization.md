@@ -1,6 +1,6 @@
 # Native Goose dense-backward CPU optimization — 2026-11-05
 
-**Status:** Matched Goose/C benchmark and numerical reference tests passed. The optimized implementation is committed in the CPU library; full integration and learning regression CI is tracked separately below.
+**Status: Fully CI-verified.** Matched Goose/C benchmark, numerical reference tests and full CPU training/RL regressions passed after integration into the library.
 
 ## Evidence and reproduction
 
@@ -11,6 +11,7 @@
 - [Independent-process comparison runner](../runner/compare_backward.py)
 - [CPU library implementation](../../src/ops/cpu.goose)
 - [Full-element API regression test](../../tests/goose/dense_backward_shapes.goose)
+- [Passing full CPU regression suite after integration](https://github.com/arman-dogru/deep-goose/actions/runs/42088544354)
 - [Numerical finite differences for dX, dW, db](../../tests/goose/gradient_check.goose)
 
 All timings are **exploratory** and originate from a shared GitHub-hosted Ubuntu 24.04 virtual CPU. The machine in this run reports an Intel Xeon Platinum 8370C, two visible CPU cores, Clang 18.1.3 and pinned Goose v2026.3. Different GitHub Actions runs may use different processors. Do not combine these results with independent runs to calculate speedups.
@@ -70,7 +71,7 @@ The public tests cover:
 - Repeated calls into the same output buffers to ensure all three gradients are overwritten.
 - Finite-difference gradients for **inputs, weights and bias** on a small MSE loss.
 
-The pre-existing CI suite additionally exercises the implementation indirectly through SGD regression, Adam regression, XOR nonlinear MLP training, multiclass softmax learning and a native Deep Q-Network. Passing those checks is required before promoting integration to verified status.
+The [full CPU CI run](https://github.com/arman-dogru/deep-goose/actions/runs/42088544354) **passed**, including SGD regression, Adam regression, XOR nonlinear MLP training, multiclass softmax learning and the native DQN. The integration test log confirms `PASS dense backward dW/db/dX elementwise, irregular shapes and repeated calls` and `PASS finite-difference dense input, weight and bias gradients`.
 
 ## Interpretation
 
@@ -82,7 +83,7 @@ The `dX` loop still performs a scalar reduction per output element, but pre-esta
 
 ## Decision and next steps
 
-- **Adopt** row-sliced `dense_backward_f32_into` for the public native CPU library if the full regression suite passes.
+- **Adopted and fully validated:** row-sliced `dense_backward_f32_into` is now the public native CPU implementation, and full regression CI passed.
 - Retain the three reference implementations in the benchmark for reproducibility.
 - Continue CPU numerical validation on more shapes/initializations, especially gradients through larger nonlinear networks.
 - Compare native CPU training at realistic batch sizes and benchmark the optimized OpenBLAS backend; extend the eventual CUDA backend through a shared tensor operation interface.
