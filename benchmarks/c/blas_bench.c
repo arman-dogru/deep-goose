@@ -1,6 +1,7 @@
 // OpenBLAS C baseline for the Goose native adapter, matching all input values.
 #define _POSIX_C_SOURCE 200809L
 #include <cblas.h>
+#include <stdlib.h>
 #ifdef DEEP_GOOSE_ADAPTER_BENCH
 extern int32_t deep_goose_blas_sgemm(const float *a, const float *b, float *c,
                                      int64_t m, int64_t k, int64_t n);
