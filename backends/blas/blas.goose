@@ -3,8 +3,8 @@
 // The native adapter does not retain any borrowed pointers.
 namespace blas;
 
-extern fn native_sgemm(a: const f32&, b: const f32&, c: f32&,
-                       m: i64, k: i64, n: i64) -> i32 = "deep_goose_blas_sgemm";
+extern "deep_goose_blas_sgemm" fn native_sgemm(a: const f32&, b: const f32&, c: f32&,
+                       m: i64, k: i64, n: i64) -> i32;
 
 fn matmul_f32_into(a: const f32[:], b: const f32[:], c: f32[:],
                    m: i64, k: i64, n: i64) {
