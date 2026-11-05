@@ -80,6 +80,10 @@ fn matmul_f32_into(a: const f32[:], b: const f32[:], out: f32[:],
     }
 }
 
+// Fused Y = XW + b for contiguous row-major f32 inputs and output.
+// Input/weight/output storage must not alias. The innermost loop writes
+// adjacent output elements, matching the fastest measured safe CPU GEMM
+// traversal for Goose. Each output retains its original k-ascending order.
 fn dense_forward_f32_into(x: const f32[:], w: const f32[:], bias: const f32[:],
                           y: f32[:], batch: i64, in_features: i64, out_features: i64) {
     assert(batch > 0 && in_features > 0 && out_features > 0);
@@ -88,12 +92,15 @@ fn dense_forward_f32_into(x: const f32[:], w: const f32[:], bias: const f32[:],
     assert(w.len == in_features * out_features);
     assert(bias.len == out_features && y.len == batch * out_features);
     for row in 0..batch {
-        for col in 0..out_features {
-            var sum = bias[col];
-            for k in 0..in_features {
-                sum += x[row * in_features + k] * w[k * out_features + col];
+        let xrow = x[row * in_features..(row + 1) * in_features];
+        let yrow = y[row * out_features..(row + 1) * out_features];
+        for col in 0..out_features { yrow[col] = bias[col]; }
+        for inner in 0..in_features {
+            let wrow = w[inner * out_features..(inner + 1) * out_features];
+            let value = xrow[inner];
+            for col in 0..out_features {
+                yrow[col] += value * wrow[col];
             }
-            y[row * out_features + col] = sum;
         }
     }
 }
