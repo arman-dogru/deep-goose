@@ -113,7 +113,9 @@ jobs:
           python3 benchmarks/runner/compare.py \
             --goose build/goose_cpu_bench \
             --c build/c_cpu_bench \
-            --implementations goose,c,python_loop,numpy,torch_cpu \
+            --goose-blas build/goose_blas_bench \
+            --c-blas build/c_blas_bench \
+            --implementations goose,c,python_loop,numpy,torch_cpu,goose_blas,c_blas \
             --mode smoke --trials 3 \
             --output benchmarks/reports/ci
 
