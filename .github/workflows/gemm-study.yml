@@ -59,6 +59,14 @@ jobs:
           SOURCE="$(head -n 1 "$OUTPUT/generated-c-paths.txt" || true)"
           if [[ -n "$SOURCE" && -f "$SOURCE" ]]; then
             cp "$SOURCE" "$OUTPUT/goose-generated.c"
+            # Compile the emitted C for its own Clang vectorization diagnostics.
+            # This is an independent diagnostic compile, not the exact link
+            # invocation that Goose used to build its final binary.
+            clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+              -Rpass=loop-vectorize -Rpass-missed=loop-vectorize \
+              -Rpass-analysis=loop-vectorize -c "$SOURCE" \
+              -o build/goose_generated_remarks.o \
+              > "$OUTPUT/goose-vectorization.txt" 2>&1
           else
             echo "Generated C not located" > "$OUTPUT/generated-c-not-found.txt"
           fi
