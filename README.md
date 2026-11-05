@@ -16,6 +16,8 @@
 - [Adam and multiclass training](benchmarks/reports/2026-11-05-adam-and-classification.md) — five-implementation optimizer comparison, classification, checkpoint validation.
 - [Matched BLAS adapter comparison](benchmarks/reports/2026-11-05-blas-adapter-matched.md) — Goose vs C through the exact same C adapter.
 - [GEMM optimization and compiler diagnostics](benchmarks/reports/2026-11-05-gemm-optimization.md) — matched C and Goose loop orders, row slicing, blocking, Clang vectorization and bounds checks.
+- [Register-blocking evaluation](benchmarks/reports/2026-11-05-register-microkernels.md) — 4×4 and 1×4 microkernels compared in Goose/C; retained only as experimental kernels.
+- [Dense-forward optimization](benchmarks/reports/2026-11-05-dense-forward-optimization.md) — 3×–8.9× faster matched Goose kernels, integrated in the library.
 
 All reported GitHub-hosted benchmark numbers are **exploratory**. Dedicated hardware is required for publication-quality performance claims.
 
@@ -24,7 +26,7 @@ All reported GitHub-hosted benchmark numbers are **exploratory**. Dedicated hard
 | Component | Current implementation |
 |---|---|
 | CPU tensor operations | Contiguous row-major `f32` storage, add, fill, dot, **row-sliced GEMM**, ReLU |
-| Neural networks | Dense forward, dense backward, ReLU backward, MSE and derivative; stable softmax/log-softmax/cross-entropy |
+| Neural networks | **Row-sliced dense forward**, dense backward, ReLU backward, MSE and derivative; stable softmax/log-softmax/cross-entropy |
 | Optimizers | SGD and Adam primitive with explicit first/second moments |
 | CPU training | Synthetic regression with SGD or Adam; nonlinear XOR MLP; three-class softmax classifier |
 | Numerical tests | Small tensor references, finite-difference dense and cross-entropy gradients; rectangular BLAS references |
