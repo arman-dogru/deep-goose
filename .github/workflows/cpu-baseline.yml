@@ -66,6 +66,23 @@ jobs:
           clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
             -Wall -Wextra -Werror -o build/c_cpu_bench benchmarks/c/cpu_bench.c
 
+      - name: Compile regression training baselines
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check examples/regression/train.goose
+          goose build --cc clang -o build/goose_regression_train examples/regression/train.goose
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Wall -Wextra -Werror -o build/c_regression_train benchmarks/c/regression_train.c
+
+      - name: Validate and benchmark CPU training
+        run: |
+          python3 benchmarks/runner/train_compare.py \
+            --goose build/goose_regression_train \
+            --c build/c_regression_train \
+            --implementations goose,c,python_loop,numpy,torch_cpu \
+            --trials 3 --output benchmarks/reports/training-ci
+
       - name: Run reproducible smoke benchmarks
         run: |
           python3 benchmarks/runner/compare.py \
@@ -80,5 +97,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cpu-baseline-evidence
-          path: benchmarks/reports/ci/
+          path: |
+            benchmarks/reports/ci/
+            benchmarks/reports/training-ci/
           if-no-files-found: warn
