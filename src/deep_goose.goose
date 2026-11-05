@@ -1,6 +1,7 @@
 // Public package entrypoint for Deep Goose.
 // Import in a root program with: import deep_goose from "../../src";
 import ops.cpu;
+import ops.classification;
 import rl.tabular;
 namespace deep_goose;
 

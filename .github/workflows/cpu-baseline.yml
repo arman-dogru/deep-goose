@@ -68,6 +68,14 @@ jobs:
           goose build --cc clang -o build/cpu_ops_test tests/goose/cpu_ops.goose
           ./build/cpu_ops_test
 
+      - name: Validate numerically stable classification operators
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check tests/goose/classification.goose
+          goose build --cc clang -o build/classification_test tests/goose/classification.goose
+          ./build/classification_test
+
       - name: Test analytical gradients and nonlinear XOR training
         shell: bash
         run: |
