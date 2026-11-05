@@ -142,7 +142,8 @@ fn main() {
             } else {
                 target_q_values[row * 2]
             };
-            let label = rewards[row] + if terminals[row] { 0.0 } else { discount * best };
+            let bootstrap = if terminals[row] { 0.0 } else { discount * best };
+            let label = rewards[row] + bootstrap;
             let idx = row * 2 + selected_actions[row];
             grad_q[idx] = (2.0 / (batch as f32)) * (q_values[idx] - label);
         }
