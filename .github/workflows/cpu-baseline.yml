@@ -113,6 +113,14 @@ jobs:
           ./build/c_lineworld
           python3 benchmarks/python/lineworld.py
 
+      - name: Validate native CPU DQN end-to-end training
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check examples/dqn/lineworld.goose
+          goose build --cc clang -o build/goose_dqn_lineworld examples/dqn/lineworld.goose
+          ./build/goose_dqn_lineworld
+
       - name: Compile BLAS-backed baselines
         shell: bash
         run: |
