@@ -15,7 +15,7 @@ fn close(a: f32, b: f32, tolerance: f32) -> bool {
 }
 
 fn main() {
-    let x: f32[4] = [0.5, -1.25, 1.5, 0.75];
+    var x: f32[4] = [0.5, -1.25, 1.5, 0.75];
     let target: f32[2] = [0.25, -0.8];
     var w: f32[2] = [0.3, -0.4];
     var b: f32[1] = [0.1];
@@ -49,5 +49,17 @@ fn main() {
     let estimated = (positive - negative) / (2.0 * epsilon);
     assert(close(estimated, db[0], 0.003));
 
-    print("PASS finite-difference dense weight and bias gradients");
+    // Verify dX too. The original regression test only covered dW and db.
+    for i in 0..4 {
+        let initial = x[i];
+        x[i] = initial + epsilon;
+        let positive_input = loss_for(x, w, b, target);
+        x[i] = initial - epsilon;
+        let negative_input = loss_for(x, w, b, target);
+        x[i] = initial;
+        let estimated_input = (positive_input - negative_input) / (2.0 * epsilon);
+        assert(close(estimated_input, dx[i], 0.003));
+    }
+
+    print("PASS finite-difference dense input, weight and bias gradients");
 }
