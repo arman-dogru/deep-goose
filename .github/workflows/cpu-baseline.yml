@@ -68,6 +68,14 @@ jobs:
           goose build --cc clang -o build/cpu_ops_test tests/goose/cpu_ops.goose
           ./build/cpu_ops_test
 
+      - name: Validate optimized row-sliced GEMM on irregular shapes
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check tests/goose/matmul_shapes.goose
+          goose build --cc clang -o build/matmul_shapes tests/goose/matmul_shapes.goose
+          ./build/matmul_shapes
+
       - name: Validate numerically stable classification operators
         shell: bash
         run: |
