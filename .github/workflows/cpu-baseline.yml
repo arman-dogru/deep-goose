@@ -155,6 +155,18 @@ jobs:
           goose build --cc clang -o build/goose_blas_bench benchmarks/goose/blas_bench.goose
           clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
             -Wall -Wextra -Werror -o build/c_blas_bench benchmarks/c/blas_bench.c -lopenblas
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -DDEEP_GOOSE_ADAPTER_BENCH -Wall -Wextra -Werror \
+            -o build/c_blas_adapter_bench \
+            benchmarks/c/blas_bench.c backends/blas/native/gemm.c -lopenblas
+
+      - name: Verify BLAS numerical outputs element by element
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check tests/goose/blas_reference.goose
+          goose build --cc clang -o build/blas_reference tests/goose/blas_reference.goose
+          ./build/blas_reference
 
       - name: Run reproducible smoke benchmarks
         run: |
@@ -163,7 +175,8 @@ jobs:
             --c build/c_cpu_bench \
             --goose-blas build/goose_blas_bench \
             --c-blas build/c_blas_bench \
-            --implementations goose,c,python_loop,numpy,torch_cpu,goose_blas,c_blas \
+            --c-blas-adapter build/c_blas_adapter_bench \
+            --implementations goose,c,python_loop,numpy,torch_cpu,goose_blas,c_blas,c_blas_adapter \
             --mode smoke --trials 3 \
             --output benchmarks/reports/ci
 

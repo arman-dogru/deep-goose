@@ -37,10 +37,10 @@ SPECS = {
         ("matmul_ikj", 128, 3), ("matmul_ikj", 256, 1),
     ],
 }
-ALL_IMPLS = ("goose", "c", "python_loop", "numpy", "torch_cpu", "goose_blas", "c_blas")
+ALL_IMPLS = ("goose", "c", "python_loop", "numpy", "torch_cpu", "goose_blas", "c_blas", "c_blas_adapter")
 
 
-def command_for(impl, op, n, iters, goose, c, goose_blas, c_blas):
+def command_for(impl, op, n, iters, goose, c, goose_blas, c_blas, c_blas_adapter):
     if impl == "goose":
         return [str(goose), op, str(n), str(iters)]
     if impl == "c":
@@ -49,6 +49,8 @@ def command_for(impl, op, n, iters, goose, c, goose_blas, c_blas):
         return [str(goose_blas), op, str(n), str(iters)]
     if impl == "c_blas":
         return [str(c_blas), op, str(n), str(iters)]
+    if impl == "c_blas_adapter":
+        return [str(c_blas_adapter), op, str(n), str(iters)]
     return [sys.executable, str(ROOT / "benchmarks/python/cpu_bench.py"),
             impl, op, str(n), str(iters)]
 
@@ -117,8 +119,9 @@ def run(args):
     c = pathlib.Path(args.c).resolve()
     goose_blas = pathlib.Path(args.goose_blas).resolve()
     c_blas = pathlib.Path(args.c_blas).resolve()
+    c_blas_adapter = pathlib.Path(args.c_blas_adapter).resolve()
     for impl, exe in (("goose", goose), ("c", c),
-                      ("goose_blas", goose_blas), ("c_blas", c_blas)):
+                      ("goose_blas", goose_blas), ("c_blas", c_blas), ("c_blas_adapter", c_blas_adapter)):
         if impl in implementations and not exe.is_file():
             raise SystemExit(f"{impl} executable not found: {exe}")
     cases = [(op,n,iters) for op,n,iters in SPECS[args.mode]
@@ -130,14 +133,14 @@ def run(args):
         selected = [
             impl for impl in implementations
             if not (impl == "python_loop" and ((op.startswith("matmul") and n > 64) or (not op.startswith("matmul") and n > 65536)))
-            and not (impl in ("goose_blas", "c_blas") and op != "matmul")
+            and not (impl in ("goose_blas", "c_blas", "c_blas_adapter") and op != "matmul")
         ]
         # Compare programming-language performance with randomized process order.
         for trial in range(args.trials):
             order = list(selected)
             rng.shuffle(order)
             for impl in order:
-                cmd = command_for(impl, op, n, iters, goose, c, goose_blas, c_blas)
+                cmd = command_for(impl, op, n, iters, goose, c, goose_blas, c_blas, c_blas_adapter)
                 print(f"[{op} n={n} trial={trial}] {impl}", flush=True)
                 try:
                     finished = subprocess.run(cmd, text=True, capture_output=True, timeout=args.timeout, check=True)
@@ -202,6 +205,7 @@ def main():
     p.add_argument("--c", default="build/c_cpu_bench")
     p.add_argument("--goose-blas", default="build/goose_blas_bench")
     p.add_argument("--c-blas", default="build/c_blas_bench")
+    p.add_argument("--c-blas-adapter", default="build/c_blas_adapter_bench")
     p.add_argument("--implementations", default="goose,c,python_loop,numpy")
     p.add_argument("--mode", choices=sorted(SPECS), default="smoke")
     p.add_argument("--trials", type=int, default=3)
