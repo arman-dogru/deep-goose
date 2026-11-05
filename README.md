@@ -2,7 +2,7 @@
 
 **Deep Goose** is an experimental, CPU-first AI and reinforcement-learning library implemented primarily in [Goose](https://aardappel.github.io/goose/), with matched C, Python, NumPy, and PyTorch baselines. The project is evaluating Goose's numerical performance, memory/lifetime model, native-library interoperability, and usefulness for AI systems. A CUDA backend is the next major phase, not a currently available feature.
 
-**Status (2026-11-05):** working and CI-tested CPU mathematical operators, dense forward/backward passes, SGD and Adam, nonlinear XOR training, tabular Q-learning, fixed-capacity replay storage, and optional OpenBLAS GEMM. Native CPU DQN has now passed its first end-to-end training/evaluation CI run. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for verification status and remaining work.
+**Status (2026-11-05):** working and CI-tested CPU mathematical operators, dense forward/backward passes, SGD and Adam, stable cross-entropy classification, versioned dense-parameter checkpoints, nonlinear XOR training, tabular Q-learning, fixed-capacity replay storage, and optional OpenBLAS GEMM. Native CPU DQN has now passed its first end-to-end training/evaluation CI run. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for verification status and remaining work.
 
 ## Project documents
 
@@ -13,6 +13,8 @@
 - [GEMM loop order benchmark](benchmarks/reports/2026-11-05-gemm-loop-order.md) — naive versus i-k-j.
 - [Tabular LineWorld comparison](benchmarks/reports/2026-11-05-lineworld.md) — Goose versus C/Python learning.
 - [Native DQN training](benchmarks/reports/2026-11-05-dqn-lineworld.md) — CPU DQN learning and greedy evaluation.
+- [Adam and multiclass training](benchmarks/reports/2026-11-05-adam-and-classification.md) — five-implementation optimizer comparison, classification, checkpoint validation.
+- [Matched BLAS adapter comparison](benchmarks/reports/2026-11-05-blas-adapter-matched.md) — Goose vs C through the exact same C adapter.
 
 All reported GitHub-hosted benchmark numbers are **exploratory**. Dedicated hardware is required for publication-quality performance claims.
 
@@ -21,12 +23,13 @@ All reported GitHub-hosted benchmark numbers are **exploratory**. Dedicated hard
 | Component | Current implementation |
 |---|---|
 | CPU tensor operations | Contiguous row-major `f32` storage, add, fill, dot, GEMM, ReLU |
-| Neural networks | Dense forward, dense backward, ReLU backward, MSE and derivative |
+| Neural networks | Dense forward, dense backward, ReLU backward, MSE and derivative; stable softmax/log-softmax/cross-entropy |
 | Optimizers | SGD and Adam primitive with explicit first/second moments |
-| CPU training | Synthetic regression; nonlinear XOR MLP |
-| Numerical tests | Small tensor references, finite-difference dense gradients |
+| CPU training | Synthetic regression with SGD or Adam; nonlinear XOR MLP; three-class softmax classifier |
+| Numerical tests | Small tensor references, finite-difference dense and cross-entropy gradients; rectangular BLAS references |
 | RL | Standard Q-learning, replay buffer, tabular LineWorld, DQN LineWorld example |
-| Optional BLAS | Goose/C adapter to OpenBLAS CBLAS SGEMM |
+| Optional BLAS | Goose/C adapter to OpenBLAS CBLAS SGEMM, plus adapter-matched C performance control |
+| Checkpoints | Versioned dense-layer weights and biases (optimizer state is not yet saved) |
 | Benchmarking | Same input generation, randomized trial order, raw JSON, summary reports |
 | Comparison backends | Native Goose, handwritten C, Python loops, NumPy, PyTorch CPU, OpenBLAS |
 
