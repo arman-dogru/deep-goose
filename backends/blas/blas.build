@@ -1,0 +1,3 @@
+// Optional OpenBLAS adapter; requires the host package libopenblas-dev.
+c_sources = ["native/gemm.c"];
+c_libs_linux = ["openblas"];
