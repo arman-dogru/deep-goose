@@ -1,5 +1,5 @@
 // Deep Goose: controlled row-major f32 GEMM loop-order / cache-tiling study.
-// CLI: ./gemm_study <ijk|ikj|blocked32> <n> <repetitions>
+// CLI: ./gemm_study <ijk|ikj|blocked32|rows> <n> <repetitions>
 // Outputs GEMM_RESULT,goose,variant,n,repetitions,elapsed_ns,max_abs_error,checksum
 // Inputs and result validation are outside the timed region.
 // Every output element is checked against a separate f64 reference.
@@ -57,14 +57,34 @@ fn gemm_blocked32(a: const f32[:], b: const f32[:], c: f32[:], n: i64) {
     }
 }
 
+// A row-slice formulation: establish row spans before the inner j loop.
+// The intent is to let Goose's BCE hoist range checks to slice creation,
+// rather than rechecking indexed matrix arithmetic at every iteration.
+fn gemm_rows(a: const f32[:], b: const f32[:], c: f32[:], n: i64) {
+    for pos in 0..c.len { c[pos] = 0.0; }
+    for i in 0..n {
+        let a_row = a[i * n..(i + 1) * n];
+        let c_row = c[i * n..(i + 1) * n];
+        for k in 0..n {
+            let b_row = b[k * n..(k + 1) * n];
+            let aik = a_row[k];
+            for j in 0..n {
+                c_row[j] += aik * b_row[j];
+            }
+        }
+    }
+}
+
 fn perform(a: const f32[:], b: const f32[:], c: f32[:], n: i64,
            variant: const u8[:]) {
     if variant == "ijk" {
         gemm_ijk(a, b, c, n);
     } else if variant == "ikj" {
         gemm_ikj(a, b, c, n);
-    } else {
+    } else if variant == "blocked32" {
         gemm_blocked32(a, b, c, n);
+    } else {
+        gemm_rows(a, b, c, n);
     }
 }
 
@@ -77,7 +97,7 @@ fn main() {
     let variant = argv[1];
     let n, ok_n = parse_int(argv[2]);
     let repetitions, ok_reps = parse_int(argv[3]);
-    guard (variant == "ijk" || variant == "ikj" || variant == "blocked32") &&
+    guard (variant == "ijk" || variant == "ikj" || variant == "blocked32" || variant == "rows") &&
           ok_n && ok_reps && n >= 1 && n <= 256 &&
           repetitions > 0 && repetitions <= 10000 else {
         print("invalid GEMM study arguments");

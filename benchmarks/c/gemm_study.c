@@ -1,6 +1,6 @@
 // Matched f32 GEMM study for Goose benchmarks/goose/gemm_study.goose.
 // clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Werror
-// CLI: ./gemm_study <ijk|ikj|blocked32> <n> <repetitions>
+// CLI: ./gemm_study <ijk|ikj|blocked32|rows> <n> <repetitions>
 // Output: GEMM_RESULT,c,variant,n,repetitions,elapsed_ns,max_abs_error,checksum
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
@@ -58,11 +58,25 @@ static void gemm_blocked32(const float *a, const float *b, float *c, size_t n) {
     }
 }
 
+static void gemm_rows(const float *a, const float *b, float *c, size_t n) {
+    for (size_t pos=0; pos<n*n; ++pos) c[pos] = 0.0f;
+    for (size_t i=0; i<n; ++i) {
+        const float *a_row = a + i*n;
+        float *c_row = c + i*n;
+        for (size_t k=0; k<n; ++k) {
+            const float *b_row = b + k*n;
+            const float aik = a_row[k];
+            for (size_t j=0; j<n; ++j) c_row[j] += aik * b_row[j];
+        }
+    }
+}
+
 static void perform(const float *a, const float *b, float *c, size_t n,
                     const char *variant) {
     if (strcmp(variant, "ijk") == 0) gemm_ijk(a, b, c, n);
     else if (strcmp(variant, "ikj") == 0) gemm_ikj(a, b, c, n);
-    else gemm_blocked32(a, b, c, n);
+    else if (strcmp(variant, "blocked32") == 0) gemm_blocked32(a, b, c, n);
+    else gemm_rows(a, b, c, n);
 }
 
 static long parse_arg(const char *raw, long limit) {
@@ -79,8 +93,8 @@ static long parse_arg(const char *raw, long limit) {
 int main(int argc, char **argv) {
     if (argc != 4 ||
         (strcmp(argv[1], "ijk") && strcmp(argv[1], "ikj") &&
-         strcmp(argv[1], "blocked32"))) {
-        fprintf(stderr, "usage: gemm_study <ijk|ikj|blocked32> <n> <repetitions>\n");
+         strcmp(argv[1], "blocked32") && strcmp(argv[1], "rows"))) {
+        fprintf(stderr, "usage: gemm_study <ijk|ikj|blocked32|rows> <n> <repetitions>\n");
         return 2;
     }
     const char *variant = argv[1];

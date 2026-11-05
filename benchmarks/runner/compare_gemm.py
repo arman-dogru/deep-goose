@@ -27,7 +27,7 @@ SIZES = {
         (127, 20), (128, 20), (129, 18), (256, 4),
     ],
 }
-VARIANTS = ("ijk", "ikj", "blocked32")
+VARIANTS = ("ijk", "ikj", "blocked32", "rows")
 IMPLEMENTATIONS = ("goose", "c")
 
 
@@ -160,8 +160,8 @@ def main():
         "> Exploratory GitHub-hosted CPU execution, NOT controlled performance evidence.",
         "> Matched Clang optimization and f32 row-major inputs. Output validated elementwise",
         "> against an independent f64 reference OUTSIDE the timed region.",
-        "> All variants accumulate each C[i,j] in increasing k order. i-k-j and blocked",
-        "> versions include output zeroing inside the timed call; i-j-k overwrites output.",
+        "> All variants accumulate each C[i,j] in increasing k order. ikj, blocked32",
+        "> and rows include output zeroing inside the timed call; ijk overwrites output.",
         "",
         f"Mode: `{args.mode}`; trials per language/shape/variant: `{args.trials}`.",
         "",
