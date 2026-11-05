@@ -22,12 +22,15 @@ ALL = ("goose", "c", "python_loop", "numpy", "torch_cpu")
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument("--optimizer", choices=("sgd","adam"), default="sgd")
     p.add_argument("--goose", default="build/goose_regression_train")
     p.add_argument("--c", default="build/c_regression_train")
     p.add_argument("--implementations", default="goose,c,python_loop,numpy,torch_cpu")
     p.add_argument("--trials", type=int, default=5)
     p.add_argument("--output", default="benchmarks/reports/regression")
     args = p.parse_args()
+    expected_tag = "ADAM_RESULT" if args.optimizer == "adam" else "TRAIN_RESULT"
+    expected_epochs = "250" if args.optimizer == "adam" else "200"
     impls = [x.strip() for x in args.implementations.split(",") if x.strip()]
     if args.trials < 1 or not impls or any(i not in ALL for i in impls):
         raise SystemExit("invalid trials/implementations")
@@ -42,14 +45,14 @@ def main():
             elif impl == "c":
                 cmd = [str(pathlib.Path(args.c).resolve())]
             else:
-                cmd = [sys.executable, str(ROOT/"benchmarks/python/regression_train.py"), impl]
+                cmd = [sys.executable, str(ROOT/("benchmarks/python/regression_adam.py" if args.optimizer == "adam" else "benchmarks/python/regression_train.py")), impl]
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=True)
-                rows = [r for r in result.stdout.splitlines() if r.startswith("TRAIN_RESULT,")]
+                rows = [r for r in result.stdout.splitlines() if r.startswith(expected_tag+",")]
                 if len(rows) != 1:
                     raise ValueError(f"expected one result row: {result.stdout[:300]}")
                 parts = rows[0].split(",")
-                if len(parts) != 8 or parts[1] != impl or parts[2] != "200":
+                if len(parts) != 8 or parts[1] != impl or parts[2] != expected_epochs:
                     raise ValueError(f"malformed record: {parts}")
                 _, _, epochs, ns, loss, w0, w1, bias = parts
                 record = {
@@ -91,10 +94,10 @@ def main():
     (output/"summary.json").write_text(json.dumps(summary,indent=2)+"\n")
     (output/"failures.json").write_text(json.dumps(failures,indent=2)+"\n")
     lines=[
-        "# Exploratory CPU regression-training comparison", "",
-        "256 examples, two input features, one output, MSE, full-batch SGD, 200 epochs.",
+        f"# Exploratory CPU regression-training comparison ({args.optimizer.upper()})", "",
+        f"256 examples, two input features, one output, MSE, full-batch {args.optimizer.upper()}, {expected_epochs} epochs.",
         "Weights initialize to zero; target is \`1.5*x0 - 2*x1 + 0.25\`.",
-        "Reported time includes forward, backward and SGD, excludes dataset creation and final evaluation.",
+        f"Reported time includes forward, backward and {args.optimizer.upper()}, excludes dataset creation and final evaluation.",
         "Goose/C use f32 accumulation; Python loop uses f64; NumPy/PyTorch use optimized tensor ops.",
         "Shared CI hardware is **not** controlled benchmark infrastructure.",
         "", "| Implementation | Median training ms | Min ms | Max ms | Median MSE | Trials |",
