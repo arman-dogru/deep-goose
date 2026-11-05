@@ -1,75 +1,110 @@
 # Deep Goose
 
-An experimental, CPU-first AI and reinforcement-learning library written primarily in [Goose](https://aardappel.github.io/goose/), with reproducible comparisons against C, pure Python, NumPy and PyTorch. A CUDA backend is planned after CPU correctness and performance gates.
+**Deep Goose** is an experimental, CPU-first AI and reinforcement-learning library implemented primarily in [Goose](https://aardappel.github.io/goose/), with matched C, Python, NumPy, and PyTorch baselines. The project is evaluating Goose's numerical performance, memory/lifetime model, native-library interoperability, and usefulness for AI systems. A CUDA backend is the next major phase, not a currently available feature.
 
-**Status:** early CPU benchmark implementation. **No Goose performance claim has been established.**
+**Status (2026-11-05):** working and CI-tested CPU mathematical operators, dense forward/backward passes, SGD and Adam, nonlinear XOR training, tabular Q-learning, fixed-capacity replay storage, and optional OpenBLAS GEMM. A complete native CPU DQN example is present and under CI validation. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for verification status and remaining work.
 
-Read the [engineering plan](ENGINEERING_PLAN.md) for architecture, work phases, acceptance gates and the CUDA roadmap.
+## Project documents
 
-## Initial CPU benchmarks
+- [Engineering plan](ENGINEERING_PLAN.md) — detailed CPU-to-CUDA roadmap, acceptance gates, benchmark protocol.
+- [Implementation status](docs/IMPLEMENTATION_STATUS.md) — delivered, tested, and remaining work.
+- [Latest OpenBLAS benchmark](benchmarks/reports/2026-11-05-openblas.md) — real Goose/C/NumPy/PyTorch exploratory measurements.
+- [CPU MLP training benchmark](benchmarks/reports/2026-11-05-regression-training.md) — matched regression workload.
+- [GEMM loop order benchmark](benchmarks/reports/2026-11-05-gemm-loop-order.md) — naive versus i-k-j.
+- [Tabular LineWorld comparison](benchmarks/reports/2026-11-05-lineworld.md) — Goose versus C/Python learning.
 
-The repository currently contains equivalent Goose and C implementations of:
+All reported GitHub-hosted benchmark numbers are **exploratory**. Dedicated hardware is required for publication-quality performance claims.
 
-- \`add\`: \`out[i] = a[i] + b[i]\`.
-- \`relu\`: \`out[i] = max(a[i] + b[i], 0)\`.
-- \`dot\`: sequential \`f32\` dot product.
-- \`matmul\`: naive row-major square GEMM with \`i, j, k\` loop order.
+## Implemented capabilities
 
-Python baselines include pure Python loops and NumPy, plus optional CPU PyTorch. Benchmarks use deterministic input formulas and exclude input construction, warmup, output checksum and process startup from timed regions.
+| Component | Current implementation |
+|---|---|
+| CPU tensor operations | Contiguous row-major `f32` storage, add, fill, dot, GEMM, ReLU |
+| Neural networks | Dense forward, dense backward, ReLU backward, MSE and derivative |
+| Optimizers | SGD and Adam primitive with explicit first/second moments |
+| CPU training | Synthetic regression; nonlinear XOR MLP |
+| Numerical tests | Small tensor references, finite-difference dense gradients |
+| RL | Standard Q-learning, replay buffer, tabular LineWorld, DQN LineWorld example |
+| Optional BLAS | Goose/C adapter to OpenBLAS CBLAS SGEMM |
+| Benchmarking | Same input generation, randomized trial order, raw JSON, summary reports |
+| Comparison backends | Native Goose, handwritten C, Python loops, NumPy, PyTorch CPU, OpenBLAS |
 
-### Prerequisites
+### Build prerequisites
 
-- Linux x86-64, GCC or Clang, Python 3.
-- [Goose v2026.3](https://github.com/aardappel/goose/releases/tag/v2026.3) on PATH.
-- \`numpy\` (required for automated comparison), \`torch\` (optional).
+- Linux x86-64 reference environment.
+- [Goose v2026.3](https://github.com/aardappel/goose/releases/tag/v2026.3) binary on `PATH`.
+- Clang and standard C build tools.
+- Python 3 plus `numpy` and optionally CPU `torch`.
+- Optional: OpenBLAS development headers and library (`libopenblas-dev` on Ubuntu).
 
-### Build and run
+The CI workflow downloads pinned Goose v2026.3 and validates the examples automatically.
 
-\`\`\`bash
+### Build, test, and train
+
+```bash
 mkdir -p build
-goose check benchmarks/goose/cpu_bench.goose
-goose build --cc clang -o build/goose_cpu_bench benchmarks/goose/cpu_bench.goose
-cc -O2 -std=c11 -D_POSIX_C_SOURCE=200809L -o build/c_cpu_bench benchmarks/c/cpu_bench.c
 
+# CPU tensor/optimizer and RL tests
+goose check tests/goose/cpu_ops.goose
+goose build --cc clang -o build/cpu_ops_test tests/goose/cpu_ops.goose
+./build/cpu_ops_test
+
+# Numerical gradient checks
+goose build --cc clang -o build/gradient_check tests/goose/gradient_check.goose
+./build/gradient_check
+
+# Nonlinear supervised training
+goose build --cc clang -o build/xor examples/xor/train.goose
+./build/xor
+
+# Full-batch regression benchmark (also built in C and Python)
+goose build --cc clang -o build/regression examples/regression/train.goose
+./build/regression
+
+# Tabular RL
+goose build --cc clang -o build/lineworld examples/rl/lineworld.goose
+./build/lineworld
+
+# Neural DQN example — check CI verification status before relying on it
+goose build --cc clang -o build/dqn examples/dqn/lineworld.goose
+./build/dqn
+```
+
+### Compare Goose, C, Python, NumPy, and PyTorch
+
+```bash
+# Native CPU kernels
+goose build --cc clang -o build/goose_cpu_bench benchmarks/goose/cpu_bench.goose
+clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+    -o build/c_cpu_bench benchmarks/c/cpu_bench.c
+
+# Optional BLAS-backed kernels
+goose build --cc clang -o build/goose_blas_bench benchmarks/goose/blas_bench.goose
+clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+    -o build/c_blas_bench benchmarks/c/blas_bench.c -lopenblas
+
+# Run on a stable dedicated machine for performance claims
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
 python3 benchmarks/runner/compare.py \
     --goose build/goose_cpu_bench \
     --c build/c_cpu_bench \
-    --implementations goose,c,python_loop,numpy,torch_cpu \
-    --mode smoke --trials 3 \
-    --output benchmarks/reports/latest
-\`\`\`
+    --goose-blas build/goose_blas_bench \
+    --c-blas build/c_blas_bench \
+    --implementations goose,c,goose_blas,c_blas,python_loop,numpy,torch_cpu \
+    --mode smoke --trials 5 \
+    --output benchmarks/reports/local
+```
 
-Choose \`--mode full\` for larger workloads and \`--trials 5\` (or more) for additional samples. **Do not treat GitHub-hosted CI timing as controlled benchmark data.** It is primarily for validation and regression smoke tests.
+The runner saves `hardware.json`, `raw_results.json`, `summary.json`, `failures.json`, and `report.md`. For a larger workload matrix, use `--mode full`.
 
-Each implementation outputs:
+### Benchmark integrity
 
-\`\`\`text
-RESULT,implementation,operation,n,iterations,elapsed_ns,checksum
-\`\`\`
+Results distinguish **matched implementations** (same loop and data layout in Goose/C) from **framework comparisons** (NumPy/PyTorch/BLAS call optimized native kernels). The runner excludes initialization, warm-up, process launch and output checksum from the kernel timing. Pure Python loops use Python binary64 floats; the native tensor programs use f32. ReLU is fused in Goose/C but not in the NumPy/PyTorch baseline.
 
-The runner saves \`hardware.json\`, \`raw_results.json\`, \`summary.json\`, \`failures.json\` and \`report.md\`.
+Do **not** generalize a tiny XOR/regression or shared-runner timing to large-model performance. End-to-end model training, numerical checks, memory behavior, and controlled hardware are all required for a defensible conclusion.
 
-### Comparison limitations
+## Contributing and scope
 
-- Pure Python computes using Python \`float\` (binary64), while compiled and tensor implementations use \`f32\`.
-- NumPy and PyTorch invoke optimized numerical routines that are **not algorithmically equivalent** to naive GEMM.
-- NumPy/PyTorch ReLU uses two operations, while Goose/C fuse add and ReLU in a single loop.
-- All results are single-thread oriented; the runner limits common BLAS thread variables.
-- Aggregate checksums are only an initial smoke check, not full elementwise correctness tests.
-- The benchmark host, build flags, actual compiler revision, warmup, variability and operation granularity are crucial to interpretation.
+The [engineering plan](ENGINEERING_PLAN.md) prioritizes reproducible CPU measurements and correctness before the CUDA phase. The immediate next CPU work includes wider matrix shapes, blocked GEMM and profiler diagnostics, an adapter-matched CBLAS control, fully validated Adam training, stronger deterministic tests, and deep RL benchmarks against equivalent Python/C implementations.
 
-The next milestones are comprehensive correctness tests, optimized GEMM comparisons, tensor storage and a CPU MLP.
-
-## Directory layout
-
-\`\`\`text
-ENGINEERING_PLAN.md
-benchmarks/
-  c/cpu_bench.c
-  goose/cpu_bench.goose
-  python/cpu_bench.py
-  runner/compare.py
-  reports/              # generated, not committed unless reviewed
-.github/workflows/cpu-baseline.yml
-\`\`\`
+CUDA is deliberately not included in the CPU package dependencies.
