@@ -2,7 +2,7 @@
 
 **Deep Goose** is an experimental, CPU-first AI and reinforcement-learning library implemented primarily in [Goose](https://aardappel.github.io/goose/), with matched C, Python, NumPy, and PyTorch baselines. The project is evaluating Goose's numerical performance, memory/lifetime model, native-library interoperability, and usefulness for AI systems. A CUDA backend is the next major phase, not a currently available feature.
 
-**Status (2026-11-05):** working and CI-tested CPU mathematical operators, dense forward/backward passes, SGD and Adam, nonlinear XOR training, tabular Q-learning, fixed-capacity replay storage, and optional OpenBLAS GEMM. A complete native CPU DQN example is present and under CI validation. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for verification status and remaining work.
+**Status (2026-11-05):** working and CI-tested CPU mathematical operators, dense forward/backward passes, SGD and Adam, nonlinear XOR training, tabular Q-learning, fixed-capacity replay storage, and optional OpenBLAS GEMM. Native CPU DQN has now passed its first end-to-end training/evaluation CI run. See [implementation status](docs/IMPLEMENTATION_STATUS.md) for verification status and remaining work.
 
 ## Project documents
 
@@ -12,6 +12,7 @@
 - [CPU MLP training benchmark](benchmarks/reports/2026-11-05-regression-training.md) — matched regression workload.
 - [GEMM loop order benchmark](benchmarks/reports/2026-11-05-gemm-loop-order.md) — naive versus i-k-j.
 - [Tabular LineWorld comparison](benchmarks/reports/2026-11-05-lineworld.md) — Goose versus C/Python learning.
+- [Native DQN training](benchmarks/reports/2026-11-05-dqn-lineworld.md) — CPU DQN learning and greedy evaluation.
 
 All reported GitHub-hosted benchmark numbers are **exploratory**. Dedicated hardware is required for publication-quality performance claims.
 
@@ -65,7 +66,7 @@ goose build --cc clang -o build/regression examples/regression/train.goose
 goose build --cc clang -o build/lineworld examples/rl/lineworld.goose
 ./build/lineworld
 
-# Neural DQN example — check CI verification status before relying on it
+# Neural DQN example — deterministic CI-verified LineWorld run
 goose build --cc clang -o build/dqn examples/dqn/lineworld.goose
 ./build/dqn
 ```
