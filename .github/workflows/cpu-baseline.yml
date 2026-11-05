@@ -84,6 +84,14 @@ jobs:
           goose build --cc clang -o build/goose_classification_train examples/classification/train.goose
           ./build/goose_classification_train
 
+      - name: Validate portable dense-parameter checkpointing
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check tests/goose/checkpoint.goose
+          goose build --cc clang -o build/checkpoint_test tests/goose/checkpoint.goose
+          ./build/checkpoint_test
+
       - name: Test analytical gradients and nonlinear XOR training
         shell: bash
         run: |
