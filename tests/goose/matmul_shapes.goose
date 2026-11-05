@@ -7,10 +7,10 @@ fn check_shape(m: i64, k: i64, n: i64) {
     var b: f32[>..] = [];
     var out: f32[>..] = [];
     for index in 0..m * k {
-        a.push((((index * 17) % 31) as f32 - 15.0) * 0.125);
+        a.push((((index * 17) % 31) as f32 - 15.0) * 0.1267);
     }
     for index in 0..k * n {
-        b.push((((index * 13) % 29) as f32 - 14.0) * 0.125);
+        b.push((((index * 13) % 29) as f32 - 14.0) * 0.1193);
     }
     for index in 0..m * n { out.push(-999.0); }
     deep_goose::matmul_f32_into(a, b, out, m, k, n);
