@@ -1,5 +1,5 @@
 // Deep Goose: controlled row-major f32 GEMM loop-order / cache-tiling study.
-// CLI: ./gemm_study <ijk|ikj|blocked32|rows|micro4> <n> <repetitions>
+// CLI: ./gemm_study <ijk|ikj|blocked32|rows|micro4|micro1x4> <n> <repetitions>
 // Outputs GEMM_RESULT,goose,variant,n,repetitions,elapsed_ns,max_abs_error,checksum
 // Inputs and result validation are outside the timed region.
 // Every output element is checked against a separate f64 reference.
@@ -177,6 +177,43 @@ fn gemm_micro4(a: const f32[:], b: const f32[:], c: f32[:], n: i64) {
     }
 }
 
+// One row and four columns per tile. A four-element B slice is created
+// before its scalar loads so range validation can be hoisted to the slice.
+fn gemm_micro1x4(a: const f32[:], b: const f32[:], c: f32[:], n: i64) {
+    for pos in 0..c.len { c[pos] = 0.0; }
+    let full = (n / 4) * 4;
+    for i in 0..n {
+        let ar = a[i * n..(i + 1) * n];
+        let cr = c[i * n..(i + 1) * n];
+        for bj in 0..(n / 4) {
+            let j = bj * 4;
+            var s0: f32 = 0.0;
+            var s1: f32 = 0.0;
+            var s2: f32 = 0.0;
+            var s3: f32 = 0.0;
+            for k in 0..n {
+                let bk = b[k * n + j..k * n + j + 4];
+                let value = ar[k];
+                s0 += value * bk[0];
+                s1 += value * bk[1];
+                s2 += value * bk[2];
+                s3 += value * bk[3];
+            }
+            cr[j] = s0;
+            cr[j + 1] = s1;
+            cr[j + 2] = s2;
+            cr[j + 3] = s3;
+        }
+        for j in full..n {
+            var sum: f32 = 0.0;
+            for k in 0..n {
+                sum += ar[k] * b[k * n + j];
+            }
+            cr[j] = sum;
+        }
+    }
+}
+
 fn perform(a: const f32[:], b: const f32[:], c: f32[:], n: i64,
            variant: const u8[:]) {
     if variant == "ijk" {
@@ -187,8 +224,10 @@ fn perform(a: const f32[:], b: const f32[:], c: f32[:], n: i64,
         gemm_blocked32(a, b, c, n);
     } else if variant == "rows" {
         gemm_rows(a, b, c, n);
-    } else {
+    } else if variant == "micro4" {
         gemm_micro4(a, b, c, n);
+    } else {
+        gemm_micro1x4(a, b, c, n);
     }
 }
 
@@ -201,7 +240,7 @@ fn main() {
     let variant = argv[1];
     let n, ok_n = parse_int(argv[2]);
     let repetitions, ok_reps = parse_int(argv[3]);
-    guard (variant == "ijk" || variant == "ikj" || variant == "blocked32" || variant == "rows" || variant == "micro4") &&
+    guard (variant == "ijk" || variant == "ikj" || variant == "blocked32" || variant == "rows" || variant == "micro4" || variant == "micro1x4") &&
           ok_n && ok_reps && n >= 1 && n <= 256 &&
           repetitions > 0 && repetitions <= 10000 else {
         print("invalid GEMM study arguments");

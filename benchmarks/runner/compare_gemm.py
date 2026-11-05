@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent-process Goose/C GEMM investigation.
 
-Each language implements ijk, ikj, 32x32x32 blocked, row-sliced, and 4x4 register GEMM, each validates
+Each language implements ijk, ikj, 32x32x32 blocked, row-sliced, and 4x4 and 1x4 register GEMM, each validates
 every result element against an f64 reference OUTSIDE its timed interval.
 Generated raw samples, summary table, and host metadata are retained.
 This is experimental shared-host data, not publication-quality performance.
@@ -27,7 +27,7 @@ SIZES = {
         (127, 20), (128, 20), (129, 18), (256, 4),
     ],
 }
-VARIANTS = ("ijk", "ikj", "blocked32", "rows", "micro4")
+VARIANTS = ("ijk", "ikj", "blocked32", "rows", "micro4", "micro1x4")
 IMPLEMENTATIONS = ("goose", "c")
 
 
@@ -161,7 +161,7 @@ def main():
         "> Matched Clang optimization and f32 row-major inputs. Output validated elementwise",
         "> against an independent f64 reference OUTSIDE the timed region.",
         "> All variants accumulate each C[i,j] in increasing k order. ikj, blocked32",
-        "> rows and micro4 include output zeroing inside the timed call; ijk overwrites output.",
+        "> rows, micro4 and micro1x4 include output zeroing inside the timed call; ijk overwrites output.",
         "",
         f"Mode: `{args.mode}`; trials per language/shape/variant: `{args.trials}`.",
         "",
