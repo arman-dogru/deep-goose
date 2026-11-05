@@ -1,0 +1,109 @@
+name: GEMM compiler and blocking investigation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/gemm-study.yml"
+      - "benchmarks/goose/gemm_study.goose"
+      - "benchmarks/c/gemm_study.c"
+      - "benchmarks/runner/compare_gemm.py"
+  workflow_dispatch:
+
+jobs:
+  gemm-study:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Goose v2026.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 \
+            https://github.com/aardappel/goose/releases/download/v2026.3/goose-v2026.3-linux-x64.tar.gz \
+            -o /tmp/goose.tar.gz
+          mkdir -p /tmp/goose-dist
+          tar -xzf /tmp/goose.tar.gz -C /tmp/goose-dist
+          GOOSE_EXE="$(find /tmp/goose-dist -type f -name goose -print -quit)"
+          test -n "$GOOSE_EXE"
+          chmod +x "$GOOSE_EXE"
+          echo "$(dirname "$GOOSE_EXE")" >> "$GITHUB_PATH"
+          "$GOOSE_EXE" version
+
+      - name: Compile equivalent Goose and C GEMM variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build benchmarks/reports/gemm-codegen
+          goose check benchmarks/goose/gemm_study.goose
+          goose build --cc clang -o build/goose_gemm_study benchmarks/goose/gemm_study.goose
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Wall -Wextra -Werror -o build/c_gemm_study benchmarks/c/gemm_study.c -lm
+
+      - name: Inspect bounds checks and generated C
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUTPUT="benchmarks/reports/gemm-codegen"
+          goose check benchmarks/goose/gemm_study.goose --bce-lines \
+            > "$OUTPUT/goose-bounds-checks.txt" 2>&1 || \
+              echo "BCE diagnostic command failed; see log" >> "$OUTPUT/goose-bounds-checks.txt"
+          find "$HOME/.goose/build/prog" -type f -name 'gemm_study.c' \
+            -print > "$OUTPUT/generated-c-paths.txt" 2>&1 || true
+          SOURCE="$(head -n 1 "$OUTPUT/generated-c-paths.txt" || true)"
+          if [[ -n "$SOURCE" && -f "$SOURCE" ]]; then
+            cp "$SOURCE" "$OUTPUT/goose-generated.c"
+          else
+            echo "Generated C not located" > "$OUTPUT/generated-c-not-found.txt"
+          fi
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Rpass=loop-vectorize -Rpass-missed=loop-vectorize \
+            -Rpass-analysis=loop-vectorize -c benchmarks/c/gemm_study.c \
+            -o build/c_gemm_study_remarks.o \
+            > "$OUTPUT/c-vectorization.txt" 2>&1
+          objdump -d -C build/goose_gemm_study > "$OUTPUT/goose-disassembly.txt"
+          objdump -d -C build/c_gemm_study > "$OUTPUT/c-disassembly.txt"
+          nm -C build/goose_gemm_study > "$OUTPUT/goose-symbols.txt" || true
+          nm -C build/c_gemm_study > "$OUTPUT/c-symbols.txt" || true
+          clang --version > "$OUTPUT/clang-version.txt"
+          goose version > "$OUTPUT/goose-version.txt"
+          lscpu > "$OUTPUT/lscpu.txt"
+          echo "===== Bounds-check summary ====="
+          tail -n 25 "$OUTPUT/goose-bounds-checks.txt"
+          echo "===== C vectorization remarks ====="
+          grep -E "vectorized|not vectorized|remark:" "$OUTPUT/c-vectorization.txt" | head -n 50 || true
+
+      - name: Validate all three kernels on odd/tail dimensions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 benchmarks/runner/compare_gemm.py \
+            --goose build/goose_gemm_study --c build/c_gemm_study \
+            --mode smoke --trials 3 \
+            --output benchmarks/reports/gemm-smoke
+
+      - name: Run repeated Goose/C GEMM comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 benchmarks/runner/compare_gemm.py \
+            --goose build/goose_gemm_study --c build/c_gemm_study \
+            --mode study --trials 5 \
+            --output benchmarks/reports/gemm-study
+
+      - name: Upload raw evidence and codegen diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemm-investigation-evidence
+          path: |
+            benchmarks/reports/gemm-smoke/
+            benchmarks/reports/gemm-study/
+            benchmarks/reports/gemm-codegen/
+          if-no-files-found: warn
