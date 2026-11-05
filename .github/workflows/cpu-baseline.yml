@@ -84,6 +84,15 @@ jobs:
           goose build --cc clang -o build/dense_shapes tests/goose/dense_shapes.goose
           ./build/dense_shapes
 
+      - name: Validate optimized backward for all three gradient outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          goose check tests/goose/dense_backward_shapes.goose
+          goose build --cc clang -o build/dense_backward_shapes \
+            tests/goose/dense_backward_shapes.goose
+          ./build/dense_backward_shapes
+
       - name: Validate numerically stable classification operators
         shell: bash
         run: |
