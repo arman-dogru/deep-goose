@@ -57,18 +57,25 @@ fn dot_f32(a: const f32[:], b: const f32[:]) -> f32 {
     return result;
 }
 
+// Contiguous row-major f32 GEMM with output buffer supplied by the caller.
+// Inputs and output must refer to non-overlapping storage. Row slices make
+// the innermost columns contiguous and enable Clang auto-vectorization.
+// This preserves increasing-k summation order for each output element.
 fn matmul_f32_into(a: const f32[:], b: const f32[:], out: f32[:],
                    m: i64, k: i64, n: i64) {
     assert(m >= 0 && k >= 0 && n >= 0);
     assert(m <= 1048576 && k <= 1048576 && n <= 1048576);
     assert(m * k == a.len && k * n == b.len && m * n == out.len);
+    for index in 0..out.len { out[index] = 0.0; }
     for row in 0..m {
-        for col in 0..n {
-            var sum: f32 = 0.0;
-            for inner in 0..k {
-                sum += a[row * k + inner] * b[inner * n + col];
+        let a_row = a[row * k..(row + 1) * k];
+        let out_row = out[row * n..(row + 1) * n];
+        for inner in 0..k {
+            let b_row = b[inner * n..(inner + 1) * n];
+            let value = a_row[inner];
+            for col in 0..n {
+                out_row[col] += value * b_row[col];
             }
-            out[row * n + col] = sum;
         }
     }
 }
