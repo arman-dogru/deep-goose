@@ -1,0 +1,75 @@
+name: Dense-layer CPU optimization investigation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dense-study.yml"
+      - "benchmarks/goose/dense_study.goose"
+      - "benchmarks/c/dense_study.c"
+      - "benchmarks/runner/compare_dense.py"
+  workflow_dispatch:
+
+jobs:
+  dense-study:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Goose v2026.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 \
+            https://github.com/aardappel/goose/releases/download/v2026.3/goose-v2026.3-linux-x64.tar.gz \
+            -o /tmp/goose.tar.gz
+          mkdir -p /tmp/goose-dist
+          tar -xzf /tmp/goose.tar.gz -C /tmp/goose-dist
+          GOOSE_EXE="$(find /tmp/goose-dist -type f -name goose -print -quit)"
+          test -n "$GOOSE_EXE"
+          chmod +x "$GOOSE_EXE"
+          echo "$(dirname "$GOOSE_EXE")" >> "$GITHUB_PATH"
+          "$GOOSE_EXE" version
+
+      - name: Compile matched dense kernels
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build benchmarks/reports/dense-codegen
+          goose check benchmarks/goose/dense_study.goose
+          goose build --cc clang -o build/goose_dense_study benchmarks/goose/dense_study.goose
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Wall -Wextra -Werror -o build/c_dense_study benchmarks/c/dense_study.c -lm
+          goose check benchmarks/goose/dense_study.goose --bce-lines \
+            > benchmarks/reports/dense-codegen/goose-bounds-checks.txt 2>&1
+          clang -O2 -std=c11 -D_POSIX_C_SOURCE=200809L \
+            -Rpass=loop-vectorize -Rpass-missed=loop-vectorize \
+            -c benchmarks/c/dense_study.c -o build/c_dense_study_remarks.o \
+            > benchmarks/reports/dense-codegen/c-vectorization.txt 2>&1
+          lscpu > benchmarks/reports/dense-codegen/lscpu.txt
+
+      - name: Validate small and irregular shapes
+        run: |
+          python3 benchmarks/runner/compare_dense.py \
+            --goose build/goose_dense_study --c build/c_dense_study \
+            --mode smoke --trials 3 \
+            --output benchmarks/reports/dense-smoke
+
+      - name: Compare larger dense layers
+        run: |
+          python3 benchmarks/runner/compare_dense.py \
+            --goose build/goose_dense_study --c build/c_dense_study \
+            --mode study --trials 5 \
+            --output benchmarks/reports/dense-study
+
+      - name: Upload raw evidence and diagnostic information
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dense-layer-investigation-evidence
+          path: |
+            benchmarks/reports/dense-smoke/
+            benchmarks/reports/dense-study/
+            benchmarks/reports/dense-codegen/
+          if-no-files-found: warn
