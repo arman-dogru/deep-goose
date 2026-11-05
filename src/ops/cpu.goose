@@ -105,7 +105,12 @@ fn dense_forward_f32_into(x: const f32[:], w: const f32[:], bias: const f32[:],
     }
 }
 
-// Backward of Y=XW+b; gradients are sums over the batch (not averages).
+// Backward of Y=XW+b for contiguous row-major f32 arrays:
+//   dW = X^T dY, db = sum_rows(dY), dX = dY W^T.
+// Gradients are sums over the batch (not averages).
+// All input, weight, gradient and output buffers must be non-overlapping.
+// Row slices permit contiguous inner-column updates during dW accumulation.
+// The reduction order for each gradient element remains unchanged.
 fn dense_backward_f32_into(x: const f32[:], w: const f32[:], grad_y: const f32[:],
                            grad_x: f32[:], grad_w: f32[:], grad_b: f32[:],
                            batch: i64, in_features: i64, out_features: i64) {
@@ -114,29 +119,34 @@ fn dense_backward_f32_into(x: const f32[:], w: const f32[:], grad_y: const f32[:
     assert(x.len == batch * in_features && w.len == in_features * out_features);
     assert(grad_y.len == batch * out_features);
     assert(grad_x.len == x.len && grad_w.len == w.len && grad_b.len == out_features);
-    for col in 0..out_features {
-        var sum: f32 = 0.0;
-        for row in 0..batch {
-            sum += grad_y[row * out_features + col];
-        }
-        grad_b[col] = sum;
-    }
-    for k in 0..in_features {
-        for col in 0..out_features {
-            var sum: f32 = 0.0;
-            for row in 0..batch {
-                sum += x[row * in_features + k] * grad_y[row * out_features + col];
-            }
-            grad_w[k * out_features + col] = sum;
-        }
-    }
+
+    for col in 0..out_features { grad_b[col] = 0.0; }
+    for index in 0..grad_w.len { grad_w[index] = 0.0; }
     for row in 0..batch {
-        for k in 0..in_features {
+        let xrow = x[row * in_features..(row + 1) * in_features];
+        let dyrow = grad_y[row * out_features..(row + 1) * out_features];
+        for col in 0..out_features {
+            grad_b[col] += dyrow[col];
+        }
+        for inner in 0..in_features {
+            let gwrow = grad_w[inner * out_features..(inner + 1) * out_features];
+            let xv = xrow[inner];
+            for col in 0..out_features {
+                gwrow[col] += xv * dyrow[col];
+            }
+        }
+    }
+
+    for row in 0..batch {
+        let dyrow = grad_y[row * out_features..(row + 1) * out_features];
+        let dxrow = grad_x[row * in_features..(row + 1) * in_features];
+        for inner in 0..in_features {
+            let wrow = w[inner * out_features..(inner + 1) * out_features];
             var sum: f32 = 0.0;
             for col in 0..out_features {
-                sum += grad_y[row * out_features + col] * w[k * out_features + col];
+                sum += dyrow[col] * wrow[col];
             }
-            grad_x[row * in_features + k] = sum;
+            dxrow[inner] = sum;
         }
     }
 }
